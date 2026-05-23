@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import { Sidebar } from "@/components/sidebar";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -30,17 +29,8 @@ export default function RootLayout({
 			className={`${inter.variable} ${jetbrainsMono.variable}`}
 			suppressHydrationWarning
 		>
-			<body className="flex h-screen w-screen overflow-hidden">
-				<Providers>
-					<Sidebar />
-					<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-						<main className="flex-1 overflow-auto">
-							<div className="mx-auto w-full max-w-7xl px-8 py-8">
-								{children}
-							</div>
-						</main>
-					</div>
-				</Providers>
+			<body className="min-h-screen">
+				<Providers>{children}</Providers>
 			</body>
 		</html>
 	);

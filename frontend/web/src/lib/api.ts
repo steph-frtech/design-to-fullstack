@@ -1,8 +1,9 @@
 import type { AppType } from "backend";
 import { hc } from "hono/client";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
-
-export const api = hc<AppType>(BACKEND_URL, {
+// Empty base = same origin; Next rewrites in next.config.ts proxy
+// /api/* and /mcp to the backend. Works regardless of the host you
+// access the frontend from (localhost, sagedesk.fr, IP, etc.).
+export const api = hc<AppType>("", {
 	init: { credentials: "include" },
 });

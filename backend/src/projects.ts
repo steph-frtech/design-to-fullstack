@@ -1,5 +1,9 @@
+import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { z } from "zod";
 import { prisma } from "./db";
+
+const slugRe = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 export const projectsRoutes = new Hono()
 	.get("/", async (c) => {
@@ -12,6 +16,57 @@ export const projectsRoutes = new Hono()
 		});
 		return c.json({ projects });
 	})
+
+	.post(
+		"/",
+		zValidator(
+			"json",
+			z.object({
+				slug: z
+					.string()
+					.min(2)
+					.max(64)
+					.regex(slugRe, "lowercase letters, digits, hyphens"),
+				localeCode: z.string().min(2).max(10).default("en"),
+				localeName: z.string().min(1).max(64).default("English"),
+			}),
+		),
+		async (c) => {
+			const { slug, localeCode, localeName } = c.req.valid("json");
+
+			const existing = await prisma.project.findUnique({ where: { slug } });
+			if (existing) return c.json({ error: "slug_taken" }, 409);
+
+			const locale = await prisma.locale.upsert({
+				where: { code: localeCode },
+				update: {},
+				create: { code: localeCode, name: localeName, isDefault: true },
+			});
+
+			// TEMP owner — replace once auth is wired in the UI.
+			const owner = await prisma.user.upsert({
+				where: { email: "demo@design-to-fullstack.local" },
+				update: {},
+				create: {
+					id: "demo-user",
+					email: "demo@design-to-fullstack.local",
+					name: "Demo User",
+				},
+			});
+
+			const project = await prisma.project.create({
+				data: {
+					slug,
+					ownerId: owner.id,
+					defaultLocaleId: locale.id,
+					locales: { create: [{ localeId: locale.id }] },
+				},
+				include: { defaultLocale: true },
+			});
+
+			return c.json({ project }, 201);
+		},
+	)
 
 	.get("/:id", async (c) => {
 		const id = c.req.param("id");
