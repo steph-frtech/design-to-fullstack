@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { use } from "react";
+import { ManageLocalesDialog } from "@/components/manage-locales-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -56,10 +57,25 @@ export default function ProjectDetail({
 			/>
 
 			<div className="space-y-8">
-				<Section title="Locales" count={project.locales.length}>
+				<Section
+					title="Locales"
+					count={project.locales.length}
+					action={
+						<ManageLocalesDialog
+							projectId={project.id}
+							defaultLocaleId={project.defaultLocaleId}
+							current={project.locales}
+						/>
+					}
+				>
 					<div className="flex flex-wrap gap-1.5">
 						{project.locales.map((pl) => (
-							<Badge key={pl.localeId} variant="outline">
+							<Badge
+								key={pl.localeId}
+								variant={
+									pl.localeId === project.defaultLocaleId ? "info" : "outline"
+								}
+							>
 								{pl.locale.code} — {pl.locale.name}
 							</Badge>
 						))}
@@ -126,20 +142,25 @@ export default function ProjectDetail({
 function Section({
 	title,
 	count,
+	action,
 	children,
 }: {
 	title: string;
 	count?: number;
+	action?: React.ReactNode;
 	children: React.ReactNode;
 }) {
 	return (
 		<section>
-			<h2 className="mb-3 flex items-baseline gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-				{title}
-				{typeof count === "number" && (
-					<span className="text-zinc-400 normal-case">({count})</span>
-				)}
-			</h2>
+			<div className="mb-3 flex items-baseline justify-between">
+				<h2 className="flex items-baseline gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+					{title}
+					{typeof count === "number" && (
+						<span className="text-zinc-400 normal-case">({count})</span>
+					)}
+				</h2>
+				{action}
+			</div>
 			{children}
 		</section>
 	);
