@@ -2,8 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
-import Link from "next/link";
 import { use, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { api } from "@/lib/api";
 
 type ScreenResponse = InferResponseType<
@@ -33,32 +37,34 @@ export default function ScreenDetail({
 		},
 	});
 
-	if (screenQuery.isLoading) return <p className="text-zinc-500">Loading…</p>;
+	if (screenQuery.isLoading) return <EmptyState>Loading…</EmptyState>;
 	if (screenQuery.error)
-		return <p className="text-red-600">Error: {(screenQuery.error as Error).message}</p>;
-	if (!screenQuery.data || "error" in screenQuery.data) return <p>Screen not found.</p>;
+		return (
+			<EmptyState>
+				<span className="text-rose-300">
+					Error: {(screenQuery.error as Error).message}
+				</span>
+			</EmptyState>
+		);
+	if (!screenQuery.data || "error" in screenQuery.data)
+		return <EmptyState>Screen not found.</EmptyState>;
 
 	const { screen } = screenQuery.data;
 
 	return (
-		<div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-			<div className="space-y-6">
-				<div>
-					<Link
-						href={`/projects/${id}`}
-						className="text-sm text-zinc-500 hover:underline"
-					>
-						← Project
-					</Link>
-					<h1 className="mt-2 text-2xl font-semibold">
-						<code className="rounded bg-zinc-100 px-2 py-1 text-base dark:bg-zinc-800">
-							{screen.path}
-						</code>
-					</h1>
-					<p className="text-sm text-zinc-500">v{screen.currentVersion}</p>
-					<button
-						type="button"
-						className="mt-2 text-xs text-blue-600 hover:underline"
+		<div>
+			<PageHeader
+				back={{ href: `/projects/${id}`, label: "Project" }}
+				title={
+					<code className="rounded-lg bg-white/10 px-3 py-1 font-mono">
+						{screen.path}
+					</code>
+				}
+				subtitle={`v${screen.currentVersion}`}
+				actions={
+					<Button
+						variant="secondary"
+						size="sm"
 						onClick={() =>
 							setTarget({
 								entityType: "Screen",
@@ -67,18 +73,20 @@ export default function ScreenDetail({
 							})
 						}
 					>
-						View revision history →
-					</button>
-				</div>
+						History
+					</Button>
+				}
+			/>
 
+			<div className="grid gap-8 lg:grid-cols-[1fr_360px]">
 				<section>
-					<h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+					<h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/50">
 						Components ({screen.components.length} root)
 					</h2>
 					{screen.components.length === 0 ? (
-						<p className="text-sm text-zinc-500">No components.</p>
+						<EmptyState>No components.</EmptyState>
 					) : (
-						<ul className="space-y-2">
+						<ul className="space-y-3">
 							{screen.components.map((comp) => (
 								<ComponentNode
 									key={comp.id}
@@ -89,11 +97,11 @@ export default function ScreenDetail({
 						</ul>
 					)}
 				</section>
-			</div>
 
-			<aside className="lg:sticky lg:top-8 lg:self-start">
-				<RevisionPanel target={target} />
-			</aside>
+				<aside className="lg:sticky lg:top-24 lg:self-start">
+					<RevisionPanel target={target} />
+				</aside>
+			</div>
 		</div>
 	);
 }
@@ -105,75 +113,81 @@ function ComponentNode({
 	comp: ScreenComponent;
 	onShowRevisions: (t: RevisionTarget) => void;
 }) {
-	const hasForm = comp.form != null;
 	return (
-		<li className="rounded border border-zinc-200 p-3 dark:border-zinc-800">
-			<div className="flex items-center justify-between">
-				<div>
-					<span className="font-mono text-sm font-medium">{comp.type}</span>
-					<span className="ml-2 text-xs text-zinc-500">v{comp.currentVersion}</span>
+		<li>
+			<Card className="p-4">
+				<div className="flex items-center justify-between">
+					<div>
+						<span className="font-mono text-sm font-medium">{comp.type}</span>
+						<span className="ml-2 text-xs text-white/50">
+							v{comp.currentVersion}
+						</span>
+					</div>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() =>
+							onShowRevisions({
+								entityType: "Component",
+								entityId: comp.id,
+								label: `component ${comp.type}`,
+							})
+						}
+					>
+						history
+					</Button>
 				</div>
-				<button
-					type="button"
-					className="text-xs text-blue-600 hover:underline"
-					onClick={() =>
-						onShowRevisions({
-							entityType: "Component",
-							entityId: comp.id,
-							label: `component ${comp.type}`,
-						})
-					}
-				>
-					history
-				</button>
-			</div>
 
-			{hasForm && comp.form && (
-				<div className="mt-3 border-l-2 border-zinc-200 pl-3 dark:border-zinc-800">
-					<p className="text-xs uppercase tracking-wide text-zinc-500">
-						Form ({comp.form.fields.length} fields)
-					</p>
-					<ul className="mt-1 space-y-1">
-						{comp.form.fields.map((f) => (
-							<li key={f.id} className="flex items-center justify-between text-sm">
-								<span className="font-mono">
-									{f.name}
-									<span className="ml-2 text-xs text-zinc-500">
-										{f.type}
-										{f.required ? " · required" : ""}
-									</span>
-								</span>
-								<button
-									type="button"
-									className="text-xs text-blue-600 hover:underline"
-									onClick={() =>
-										onShowRevisions({
-											entityType: "Field",
-											entityId: f.id,
-											label: `field ${f.name}`,
-										})
-									}
+				{comp.form && (
+					<div className="mt-4 border-l-2 border-white/10 pl-4">
+						<p className="text-[10px] font-semibold uppercase tracking-wider text-white/50">
+							Form ({comp.form.fields.length} fields)
+						</p>
+						<ul className="mt-2 space-y-1.5">
+							{comp.form.fields.map((f) => (
+								<li
+									key={f.id}
+									className="flex items-center justify-between text-sm"
 								>
-									history
-								</button>
+									<span className="font-mono">
+										{f.name}
+										<span className="ml-2 text-xs text-white/50">
+											{f.type}
+											{f.required ? " · required" : ""}
+										</span>
+									</span>
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() =>
+											onShowRevisions({
+												entityType: "Field",
+												entityId: f.id,
+												label: `field ${f.name}`,
+											})
+										}
+									>
+										history
+									</Button>
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
+
+				{comp.children && comp.children.length > 0 && (
+					<ul className="mt-4 space-y-2 border-l-2 border-white/10 pl-4">
+						{comp.children.map((child) => (
+							<li
+								key={child.id}
+								className="rounded-lg bg-white/5 px-3 py-2"
+							>
+								<span className="font-mono text-xs">{child.type}</span>
 							</li>
 						))}
 					</ul>
-				</div>
-			)}
-
-			{comp.children && comp.children.length > 0 && (
-				<ul className="mt-3 space-y-2 border-l-2 border-zinc-200 pl-3 dark:border-zinc-800">
-					{comp.children.map((child) => (
-						<li
-							key={child.id}
-							className="rounded border border-zinc-200 p-2 dark:border-zinc-800"
-						>
-							<span className="font-mono text-xs">{child.type}</span>
-						</li>
-					))}
-				</ul>
-			)}
+				)}
+			</Card>
 		</li>
 	);
 }
@@ -194,51 +208,53 @@ function RevisionPanel({ target }: { target: RevisionTarget | null }) {
 
 	if (!target) {
 		return (
-			<div className="rounded border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700">
-				Click <span className="font-mono">history</span> on any node to see its
-				revisions.
-			</div>
+			<EmptyState>
+				Click <span className="font-mono text-white/80">history</span> on any
+				node to see its revisions.
+			</EmptyState>
 		);
 	}
 
 	return (
-		<div className="rounded border border-zinc-200 p-4 dark:border-zinc-800">
-			<h3 className="mb-2 text-sm font-semibold">History — {target.label}</h3>
-			{isLoading && <p className="text-sm text-zinc-500">Loading…</p>}
+		<Card className="p-4">
+			<h3 className="mb-3 text-sm font-semibold">History — {target.label}</h3>
+			{isLoading && <p className="text-sm text-white/60">Loading…</p>}
 			{data && "revisions" in data && (
-				<ul className="space-y-2">
+				<ul className="space-y-3">
 					{data.revisions.length === 0 && (
-						<li className="text-sm text-zinc-500">No revisions yet.</li>
+						<li className="text-sm text-white/60">No revisions yet.</li>
 					)}
 					{data.revisions.map((r) => (
 						<li
 							key={r.id}
-							className="border-l-2 border-zinc-200 pl-3 text-xs dark:border-zinc-700"
+							className="border-l-2 border-white/10 pl-3 text-xs"
 						>
 							<div className="flex items-center justify-between">
 								<span className="font-mono font-semibold">v{r.version}</span>
-								<span
-									className={`rounded px-1.5 py-0.5 text-[10px] ${
+								<Badge
+									variant={
 										r.op === "CREATE"
-											? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+											? "create"
 											: r.op === "UPDATE"
-												? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-												: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-									}`}
+												? "update"
+												: r.op === "DELETE"
+													? "delete"
+													: "neutral"
+									}
 								>
 									{r.op}
-								</span>
+								</Badge>
 							</div>
-							<div className="mt-0.5 text-zinc-500">
+							<div className="mt-1 text-white/50">
 								{new Date(r.createdAt).toLocaleString()}
 								{r.actor && ` · ${r.actor.email}`}
 							</div>
 							{r.diff && Object.keys(r.diff as object).length > 0 && (
 								<details className="mt-1">
-									<summary className="cursor-pointer text-zinc-600 hover:text-zinc-900 dark:text-zinc-400">
+									<summary className="cursor-pointer text-white/60 hover:text-white">
 										diff ({Object.keys(r.diff as object).length} fields)
 									</summary>
-									<pre className="mt-1 overflow-x-auto rounded bg-zinc-50 p-2 text-[10px] dark:bg-zinc-900">
+									<pre className="mt-1 overflow-x-auto rounded-lg bg-black/30 p-2 text-[10px] text-white/80">
 										{JSON.stringify(r.diff, null, 2)}
 									</pre>
 								</details>
@@ -247,6 +263,6 @@ function RevisionPanel({ target }: { target: RevisionTarget | null }) {
 					))}
 				</ul>
 			)}
-		</div>
+		</Card>
 	);
 }

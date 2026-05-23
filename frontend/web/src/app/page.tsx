@@ -2,6 +2,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { Card, CardMeta, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { api } from "@/lib/api";
 
 export default function ProjectsPage() {
@@ -16,31 +19,43 @@ export default function ProjectsPage() {
 
 	return (
 		<div>
-			<h1 className="mb-6 text-2xl font-semibold">Projects</h1>
-			{isLoading && <p className="text-zinc-500">Loading…</p>}
-			{error && <p className="text-red-600">Error: {(error as Error).message}</p>}
+			<PageHeader
+				title="Projects"
+				subtitle="Apps you've built from designs."
+			/>
+
+			{isLoading && (
+				<EmptyState>Loading…</EmptyState>
+			)}
+
+			{error && (
+				<EmptyState>
+					<span className="text-rose-300">Error: {(error as Error).message}</span>
+				</EmptyState>
+			)}
+
 			{data && data.projects.length === 0 && (
-				<p className="text-zinc-500">
+				<EmptyState>
 					No projects yet. Run{" "}
-					<code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">
+					<code className="rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-xs">
 						pnpm --filter backend seed
 					</code>{" "}
 					to add demo data.
-				</p>
+				</EmptyState>
 			)}
+
 			{data && data.projects.length > 0 && (
-				<ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+				<ul className="grid gap-4 sm:grid-cols-2">
 					{data.projects.map((p) => (
-						<li key={p.id} className="py-3">
-							<Link
-								href={`/projects/${p.id}`}
-								className="flex items-baseline justify-between hover:underline"
-							>
-								<span className="font-medium">{p.slug}</span>
-								<span className="text-sm text-zinc-500">
-									{p._count.screens} screens · {p._count.entities} entities ·{" "}
-									{p.defaultLocale.code}
-								</span>
+						<li key={p.id}>
+							<Link href={`/projects/${p.id}`} className="block">
+								<Card>
+									<CardTitle>{p.slug}</CardTitle>
+									<CardMeta className="mt-2">
+										{p._count.screens} screens · {p._count.entities} entities ·{" "}
+										{p.defaultLocale.code}
+									</CardMeta>
+								</Card>
 							</Link>
 						</li>
 					))}

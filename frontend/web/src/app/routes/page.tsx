@@ -1,20 +1,19 @@
 import Visualizer from "next-route-visualizer";
 import "reactflow/dist/style.css";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const dynamic = "force-dynamic";
 
 export default function RoutesPage() {
 	return (
-		<div className="space-y-4">
-			<div>
-				<h1 className="text-2xl font-semibold">Routes</h1>
-				<p className="text-sm text-zinc-500">
-					Visual map of the Next.js app directory routes. Click a node to inspect.
-				</p>
-			</div>
+		<div>
+			<PageHeader
+				title="Routes"
+				subtitle="Visual map of the Next.js app directory. Click a node to inspect."
+			/>
 			<div
-				className="rounded border border-zinc-200 dark:border-zinc-800"
-				style={{ height: "calc(100vh - 220px)" }}
+				className="overflow-hidden rounded-xl border border-white/10 bg-white/5"
+				style={{ height: "calc(100vh - 240px)" }}
 			>
 				<Visualizer />
 			</div>
