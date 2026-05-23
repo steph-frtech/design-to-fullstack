@@ -5,4 +5,10 @@ dist/
 .DS_Store
 *.log
 
-/generated/prisma
+# Prisma generated client (now lives under backend/)
+backend/generated/
+
+# Next.js
+frontend/web/.next/
+frontend/web/out/
+frontend/web/next-env.d.ts

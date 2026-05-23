@@ -1,9 +1,28 @@
 {
-  "devDependencies": {
-    "@biomejs/biome": "2.4.15",
-    "prisma": "^7.8.0"
-  },
-  "dependencies": {
-    "@prisma/client": "^7.8.0"
-  }
+	"name": "design-to-fullstack",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"packageManager": "pnpm@10.9.0",
+	"scripts": {
+		"dev:backend": "pnpm --filter backend dev",
+		"dev:web": "pnpm --filter @app/web dev",
+		"build": "pnpm -r build",
+		"typecheck": "pnpm -r typecheck",
+		"lint": "biome check .",
+		"format": "biome check --write ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.15",
+		"typescript": "^5.7.2"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"@prisma/client",
+			"@prisma/engines",
+			"esbuild",
+			"prisma",
+			"sharp"
+		]
+	}
 }
