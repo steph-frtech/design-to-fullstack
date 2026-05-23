@@ -1,27 +1,47 @@
 import type { HTMLAttributes } from "react";
+import { cn } from "@/lib/cn";
 
-export function Card({
-	className = "",
-	...rest
-}: HTMLAttributes<HTMLDivElement>) {
+export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
 	return (
 		<div
-			className={`rounded-xl bg-white/10 p-6 transition hover:bg-white/15 ${className}`}
+			className={cn(
+				"rounded-lg border border-zinc-200 bg-white shadow-sm",
+				className,
+			)}
 			{...rest}
 		/>
 	);
 }
 
-export function CardTitle({
-	className = "",
+export function CardHeader({
+	className,
 	...rest
-}: HTMLAttributes<HTMLHeadingElement>) {
-	return <h3 className={`text-lg font-semibold ${className}`} {...rest} />;
+}: HTMLAttributes<HTMLDivElement>) {
+	return <div className={cn("p-6", className)} {...rest} />;
 }
 
-export function CardMeta({
-	className = "",
+export function CardContent({
+	className,
+	...rest
+}: HTMLAttributes<HTMLDivElement>) {
+	return <div className={cn("p-6 pt-0", className)} {...rest} />;
+}
+
+export function CardTitle({
+	className,
+	...rest
+}: HTMLAttributes<HTMLHeadingElement>) {
+	return (
+		<h3
+			className={cn("text-base font-semibold text-zinc-900", className)}
+			{...rest}
+		/>
+	);
+}
+
+export function CardDescription({
+	className,
 	...rest
 }: HTMLAttributes<HTMLParagraphElement>) {
-	return <p className={`text-sm text-white/50 ${className}`} {...rest} />;
+	return <p className={cn("text-sm text-zinc-500", className)} {...rest} />;
 }

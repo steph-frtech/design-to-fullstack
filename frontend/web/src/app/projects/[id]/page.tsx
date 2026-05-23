@@ -1,8 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { use } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -27,10 +29,13 @@ export default function ProjectDetail({
 	if (error)
 		return (
 			<EmptyState>
-				<span className="text-rose-300">Error: {(error as Error).message}</span>
+				<span className="text-red-600">
+					Error: {(error as Error).message}
+				</span>
 			</EmptyState>
 		);
-	if (!data || "error" in data) return <EmptyState>Project not found.</EmptyState>;
+	if (!data || "error" in data)
+		return <EmptyState>Project not found.</EmptyState>;
 
 	const { project } = data;
 
@@ -41,77 +46,101 @@ export default function ProjectDetail({
 				title={project.slug}
 				subtitle={
 					<>
-						Default locale: <code className="font-mono text-white/80">{project.defaultLocale.code}</code> · v
-						{project.currentVersion}
+						Default locale{" "}
+						<code className="rounded-sm bg-zinc-100 px-1 py-0.5 font-mono text-xs text-zinc-700">
+							{project.defaultLocale.code}
+						</code>{" "}
+						· v{project.currentVersion}
 					</>
 				}
 			/>
 
-			<div className="space-y-10">
-				<section>
-					<SectionTitle>Locales</SectionTitle>
-					<div className="flex flex-wrap gap-2">
+			<div className="space-y-8">
+				<Section title="Locales" count={project.locales.length}>
+					<div className="flex flex-wrap gap-1.5">
 						{project.locales.map((pl) => (
-							<span
-								key={pl.localeId}
-								className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/80"
-							>
+							<Badge key={pl.localeId} variant="outline">
 								{pl.locale.code} — {pl.locale.name}
-							</span>
+							</Badge>
 						))}
 					</div>
-				</section>
+				</Section>
 
-				<section>
-					<SectionTitle>Entities ({project.entities.length})</SectionTitle>
-					<ul className="grid gap-2">
-						{project.entities.map((e) => (
-							<li key={e.id}>
-								<Card className="p-4">
-									<div className="flex items-baseline justify-between">
-										<span className="font-mono text-sm font-medium">{e.name}</span>
-										<span className="text-xs text-white/50">
-											{e._count.attributes} attrs · {e._count.records} records · v
-											{e.currentVersion}
+				<Section title="Entities" count={project.entities.length}>
+					{project.entities.length === 0 ? (
+						<EmptyState>No entities.</EmptyState>
+					) : (
+						<Card>
+							<ul className="divide-y divide-zinc-100">
+								{project.entities.map((e) => (
+									<li
+										key={e.id}
+										className="flex items-center justify-between px-4 py-3"
+									>
+										<span className="font-mono text-sm font-medium text-zinc-900">
+											{e.name}
 										</span>
-									</div>
-								</Card>
-							</li>
-						))}
-					</ul>
-				</section>
+										<span className="text-xs text-zinc-500">
+											{e._count.attributes} attrs · {e._count.records}{" "}
+											records · v{e.currentVersion}
+										</span>
+									</li>
+								))}
+							</ul>
+						</Card>
+					)}
+				</Section>
 
-				<section>
-					<SectionTitle>Screens ({project.screens.length})</SectionTitle>
-					<ul className="grid gap-2">
-						{project.screens.map((s) => (
-							<li key={s.id}>
-								<Link
-									href={`/projects/${project.id}/screens/${s.id}`}
-									className="block"
-								>
-									<Card className="p-4">
-										<div className="flex items-baseline justify-between">
-											<span className="font-mono text-sm font-medium">{s.path}</span>
-											<span className="text-xs text-white/50">
-												{s._count.components} components · v{s.currentVersion}
+				<Section title="Screens" count={project.screens.length}>
+					{project.screens.length === 0 ? (
+						<EmptyState>No screens.</EmptyState>
+					) : (
+						<Card>
+							<ul className="divide-y divide-zinc-100">
+								{project.screens.map((s) => (
+									<li key={s.id}>
+										<Link
+											href={`/projects/${project.id}/screens/${s.id}`}
+											className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-zinc-50"
+										>
+											<span className="font-mono text-sm text-zinc-900">
+												{s.path}
 											</span>
-										</div>
-									</Card>
-								</Link>
-							</li>
-						))}
-					</ul>
-				</section>
+											<span className="flex items-center gap-3 text-xs text-zinc-500">
+												{s._count.components} components · v
+												{s.currentVersion}
+												<ChevronRight className="h-4 w-4 text-zinc-400" />
+											</span>
+										</Link>
+									</li>
+								))}
+							</ul>
+						</Card>
+					)}
+				</Section>
 			</div>
 		</div>
 	);
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function Section({
+	title,
+	count,
+	children,
+}: {
+	title: string;
+	count?: number;
+	children: React.ReactNode;
+}) {
 	return (
-		<h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/50">
+		<section>
+			<h2 className="mb-3 flex items-baseline gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+				{title}
+				{typeof count === "number" && (
+					<span className="text-zinc-400 normal-case">({count})</span>
+				)}
+			</h2>
 			{children}
-		</h2>
+		</section>
 	);
 }
