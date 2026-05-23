@@ -101,12 +101,16 @@ model Locale {
 
 model TextKey {
   id          String   @id @default(cuid())
-  namespace   String   @unique // e.g. "form.contact.email.label"
+  projectId   String
+  namespace   String // e.g. "form.contact.email.label" — unique within a project
   description String?
   createdAt   DateTime @default(now())
 
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   translations Translation[]
 
+  @@unique([projectId, namespace])
+  @@index([projectId])
   @@schema("dtfs")
 }
 
@@ -146,6 +150,7 @@ model Project {
   theme         Theme?
   entities      Entity[]
   screens       Screen[]
+  textKeys      TextKey[]
 
   @@schema("dtfs")
 }
@@ -236,6 +241,7 @@ model Screen {
   id             String   @id @default(cuid())
   projectId      String
   path           String // e.g. "/contact"
+  type           String? // "web", "mobile", "desktop", … — used to group screens within a project
   titleKey       String?
   order          Int      @default(0)
   currentVersion Int      @default(1)
@@ -246,6 +252,7 @@ model Screen {
   components Component[]
 
   @@unique([projectId, path])
+  @@index([projectId, type])
   @@schema("dtfs")
 }
 

@@ -6,11 +6,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import { auth } from "./auth";
-import {
-	projectsRoutes,
-	revisionsRoutes,
-	translationsRoutes,
-} from "./projects";
+import { projectsRoutes, revisionsRoutes } from "./projects";
 import { createMcpServer } from "./mcp";
 
 const frontendURL = process.env.FRONTEND_URL ?? "http://localhost:3000";
@@ -29,7 +25,6 @@ const app = new Hono<{ Bindings: HttpBindings }>()
 	)
 	.route("/api/projects", projectsRoutes)
 	.route("/api/revisions", revisionsRoutes)
-	.route("/api/translations", translationsRoutes)
 	.all("/mcp", async (c) => {
 		const server = createMcpServer();
 		const transport = new StreamableHTTPServerTransport({

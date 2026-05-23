@@ -7,7 +7,6 @@ import {
 	Languages,
 	LayoutDashboard,
 	MonitorPlay,
-	Network,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -30,7 +29,6 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
 		{ href: `${base}/screens`, label: "Screens", icon: MonitorPlay },
 		{ href: `${base}/entities`, label: "Entities", icon: Database },
 		{ href: `${base}/translations`, label: "Translations", icon: Languages },
-		{ href: `${base}/routes`, label: "Routes", icon: Network },
 	];
 
 	const { data } = useQuery({

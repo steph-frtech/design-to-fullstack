@@ -112,6 +112,20 @@ export const projectsRoutes = new Hono()
 		});
 		if (!screen) return c.json({ error: "not_found" }, 404);
 		return c.json({ screen });
+	})
+
+	.get("/:id/translations", async (c) => {
+		const projectId = c.req.param("id");
+		const localeCode = c.req.query("locale");
+		const translations = await prisma.translation.findMany({
+			where: {
+				textKey: { projectId },
+				...(localeCode ? { locale: { code: localeCode } } : {}),
+			},
+			include: { textKey: true, locale: true },
+			orderBy: { textKey: { namespace: "asc" } },
+		});
+		return c.json({ translations });
 	});
 
 export const revisionsRoutes = new Hono().get("/", async (c) => {
@@ -128,12 +142,3 @@ export const revisionsRoutes = new Hono().get("/", async (c) => {
 	return c.json({ revisions });
 });
 
-export const translationsRoutes = new Hono().get("/", async (c) => {
-	const localeCode = c.req.query("locale");
-	const translations = await prisma.translation.findMany({
-		where: localeCode ? { locale: { code: localeCode } } : undefined,
-		include: { textKey: true, locale: true },
-		orderBy: { textKey: { namespace: "asc" } },
-	});
-	return c.json({ translations });
-});

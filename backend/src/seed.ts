@@ -32,16 +32,29 @@ async function main() {
 		create: { code: "fr", name: "Français" },
 	});
 
-	// ─── TextKeys + Translations ───────────────────────────────────────
+	// ─── Project (created first so TextKeys can reference it) ─────────
+	const project = await prisma.project.upsert({
+		where: { slug: "demo" },
+		update: {},
+		create: {
+			slug: "demo",
+			ownerId: user.id,
+			defaultLocaleId: en.id,
+		},
+	});
+
+	// ─── TextKeys + Translations (scoped to project) ──────────────────
 	const t = async (
 		namespace: string,
 		en_value: string,
 		fr_value: string,
 	) => {
 		const key = await prisma.textKey.upsert({
-			where: { namespace },
+			where: {
+				projectId_namespace: { projectId: project.id, namespace },
+			},
 			update: {},
-			create: { namespace },
+			create: { projectId: project.id, namespace },
 		});
 		await prisma.translation.upsert({
 			where: { textKeyId_localeId: { textKeyId: key.id, localeId: en.id } },
@@ -69,17 +82,13 @@ async function main() {
 	const optOther = await t("field.category.other", "Other", "Autre");
 	const submitLabel = await t("form.contact.submit", "Send", "Envoyer");
 
-	// ─── Project ───────────────────────────────────────────────────────
-	const project = await prisma.project.upsert({
-		where: { slug: "demo" },
-		update: {},
-		create: {
-			slug: "demo",
-			nameKey: projectName,
-			ownerId: user.id,
-			defaultLocaleId: en.id,
-		},
-	});
+	// Set the project nameKey now that the key exists
+	if (project.nameKey !== projectName) {
+		await prisma.project.update({
+			where: { id: project.id },
+			data: { nameKey: projectName },
+		});
+	}
 
 	for (const localeId of [en.id, fr.id]) {
 		await prisma.projectLocale.upsert({
@@ -125,10 +134,11 @@ async function main() {
 	// ─── Screen + Components + Form + Fields ───────────────────────────
 	const screen = await prisma.screen.upsert({
 		where: { projectId_path: { projectId: project.id, path: "/contact" } },
-		update: {},
+		update: { type: "web" },
 		create: {
 			projectId: project.id,
 			path: "/contact",
+			type: "web",
 			titleKey: screenTitle,
 		},
 	});
