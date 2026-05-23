@@ -17,7 +17,8 @@
 		"typecheck": "tsc --noEmit",
 		"db:generate": "prisma generate",
 		"db:migrate": "prisma migrate dev",
-		"db:studio": "prisma studio"
+		"db:studio": "prisma studio",
+		"seed": "tsx --env-file=../.env src/seed.ts"
 	},
 	"dependencies": {
 		"@hono/node-server": "^1.13.7",

@@ -1,5 +1,10 @@
 // Prisma schema for design-to-fullstack backend.
-// Client output is gitignored (../generated/prisma → backend/generated/prisma).
+// Two SQL schemas:
+//   - public : better-auth tables (managed by auth lib)
+//   - dtfs   : design / app definitions, i18n, records, revisions
+//
+// Every "definition" model has currentVersion + is auto-snapshotted into
+// `Revision` by the extension in src/versioning.ts.
 
 generator client {
   provider = "prisma-client"
@@ -8,11 +13,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["dtfs"]
 }
 
-// ─── better-auth core tables ──────────────────────────────────────────────
-// Schema follows better-auth's expected shape. Run `npx @better-auth/cli generate`
-// later if you add plugins (organization, 2FA, magic-link, etc.) to extend this.
+// ════════════════════════════════════════════════════════════════════════
+// public — auth (better-auth)
+// ════════════════════════════════════════════════════════════════════════
 
 model User {
   id            String    @id
@@ -22,9 +28,13 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  projects      Project[]
+
+  sessions   Session[]
+  accounts   Account[]
+  projects   Project[]
+  revisions  Revision[]
+
+  @@schema("dtfs")
 }
 
 model Session {
@@ -37,6 +47,8 @@ model Session {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@schema("dtfs")
 }
 
 model Account {
@@ -54,6 +66,8 @@ model Account {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@schema("dtfs")
 }
 
 model Verification {
@@ -63,15 +77,311 @@ model Verification {
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@schema("dtfs")
 }
 
-// ─── App tables ───────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════
+// dtfs — i18n
+// ════════════════════════════════════════════════════════════════════════
+
+model Locale {
+  id        String  @id @default(cuid())
+  code      String  @unique // "en", "fr", "fr-FR"
+  name      String
+  isDefault Boolean @default(false)
+  enabled   Boolean @default(true)
+
+  translations   Translation[]
+  projectLocales ProjectLocale[]
+  defaultFor     Project[]       @relation("ProjectDefaultLocale")
+
+  @@schema("dtfs")
+}
+
+model TextKey {
+  id          String   @id @default(cuid())
+  namespace   String   @unique // e.g. "form.contact.email.label"
+  description String?
+  createdAt   DateTime @default(now())
+
+  translations Translation[]
+
+  @@schema("dtfs")
+}
+
+model Translation {
+  id             String   @id @default(cuid())
+  textKeyId      String
+  localeId       String
+  value          String
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  textKey TextKey @relation(fields: [textKeyId], references: [id], onDelete: Cascade)
+  locale  Locale  @relation(fields: [localeId], references: [id], onDelete: Cascade)
+
+  @@unique([textKeyId, localeId])
+  @@schema("dtfs")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// dtfs — projects + theme
+// ════════════════════════════════════════════════════════════════════════
 
 model Project {
-  id        String   @id @default(cuid())
-  name      String
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  nameKey         String? // -> TextKey.namespace
+  ownerId         String
+  defaultLocaleId String
+  currentVersion  Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  defaultLocale Locale          @relation("ProjectDefaultLocale", fields: [defaultLocaleId], references: [id])
+  locales       ProjectLocale[]
+  theme         Theme?
+  entities      Entity[]
+  screens       Screen[]
+
+  @@schema("dtfs")
+}
+
+model ProjectLocale {
+  projectId String
+  localeId  String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  locale  Locale  @relation(fields: [localeId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, localeId])
+  @@schema("dtfs")
+}
+
+model Theme {
+  id             String   @id @default(cuid())
+  projectId      String   @unique
+  tokens         Json     @default("{}") // colors, typography, spacing
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@schema("dtfs")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// dtfs — data model (Entity / Attribute) + records
+// ════════════════════════════════════════════════════════════════════════
+
+model Entity {
+  id             String   @id @default(cuid())
+  projectId      String
+  name           String // technical, e.g. "Contact"
+  nameKey        String? // i18n display label
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project    Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  attributes Attribute[]
+  forms      Form[]
+  records    EntityRecord[]
+
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+model Attribute {
+  id             String    @id @default(cuid())
+  entityId       String
+  name           String
+  type           FieldType
+  required       Boolean   @default(false)
+  unique         Boolean   @default(false)
+  config         Json      @default("{}")
+  currentVersion Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId, name])
+  @@schema("dtfs")
+}
+
+model EntityRecord {
+  id             String   @id @default(cuid())
+  entityId       String
+  data           Json     @default("{}") // attribute name -> value
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@index([entityId])
+  @@schema("dtfs")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// dtfs — UI definitions
+// ════════════════════════════════════════════════════════════════════════
+
+model Screen {
+  id             String   @id @default(cuid())
+  projectId      String
+  path           String // e.g. "/contact"
+  titleKey       String?
+  order          Int      @default(0)
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  components Component[]
+
+  @@unique([projectId, path])
+  @@schema("dtfs")
+}
+
+model Component {
+  id             String   @id @default(cuid())
+  screenId       String?
+  parentId       String?
+  type           String // "form", "table", "text", "image", "container", "row", "col", ...
+  order          Int      @default(0)
+  config         Json     @default("{}") // styling/behavior (className, props, etc.)
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  screen   Screen?     @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  parent   Component?  @relation("ComponentTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Component[] @relation("ComponentTree")
+  form     Form?
+
+  @@index([screenId])
+  @@index([parentId])
+  @@schema("dtfs")
+}
+
+model Form {
+  id             String   @id @default(cuid())
+  componentId    String   @unique
+  entityId       String?
+  submitKey      String? // i18n key for submit button
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  entity    Entity?   @relation(fields: [entityId], references: [id])
+  fields    Field[]
+
+  @@schema("dtfs")
+}
+
+model Field {
+  id             String    @id @default(cuid())
+  formId         String
+  name           String // technical name, e.g. "email"
+  type           FieldType
+  order          Int       @default(0)
+  required       Boolean   @default(false)
+  defaultValue   String?
+  // i18n keys (all optional, fallback to name)
+  labelKey       String?
+  placeholderKey String?
+  helpKey        String?
+  // type-specific config: { minLength, maxLength, pattern, min, max, step, accept, multiple, ... }
+  config         Json      @default("{}")
+  currentVersion Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  form    Form          @relation(fields: [formId], references: [id], onDelete: Cascade)
+  options FieldOption[]
+
+  @@unique([formId, name])
+  @@schema("dtfs")
+}
+
+model FieldOption {
+  id             String   @id @default(cuid())
+  fieldId        String
+  value          String
+  labelKey       String // i18n key
+  order          Int      @default(0)
+  enabled        Boolean  @default(true)
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  field Field @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId, value])
+  @@schema("dtfs")
+}
+
+enum FieldType {
+  TEXT
+  TEXTAREA
+  EMAIL
+  PASSWORD
+  NUMBER
+  DATE
+  DATETIME
+  TIME
+  CHECKBOX
+  RADIO
+  SELECT
+  MULTISELECT
+  FILE
+  RICHTEXT
+  COLOR
+  RANGE
+  HIDDEN
+  CUSTOM
+
+  @@schema("dtfs")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// dtfs — versioning
+// ════════════════════════════════════════════════════════════════════════
+
+model Revision {
+  id         String      @id @default(cuid())
+  entityType String // model name, e.g. "Screen", "Field"
+  entityId   String
+  version    Int
+  op         RevisionOp
+  // full snapshot of the row at this version (post-mutation state)
+  data       Json
+  // optional diff of changed fields {field: [before, after]}
+  diff       Json?
+  actorId    String?
+  message    String?
+  createdAt  DateTime    @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@unique([entityType, entityId, version])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@schema("dtfs")
+}
+
+enum RevisionOp {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+
+  @@schema("dtfs")
 }

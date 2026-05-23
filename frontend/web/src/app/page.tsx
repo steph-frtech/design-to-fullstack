@@ -1,28 +1,51 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { api } from "@/lib/api";
 
-export default function Home() {
+export default function ProjectsPage() {
 	const { data, isLoading, error } = useQuery({
-		queryKey: ["hello"],
+		queryKey: ["projects"],
 		queryFn: async () => {
-			const res = await api.api.hello.$get({
-				query: { name: "design-to-fullstack" },
-			});
-			return await res.json();
+			const res = await api.api.projects.$get();
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			return res.json();
 		},
 	});
 
 	return (
-		<main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
-			<h1 className="text-4xl font-semibold">design-to-fullstack</h1>
-			<p className="text-zinc-500">Hono RPC + Next 16 + Tailwind v4.</p>
-			<div className="rounded-lg border border-zinc-200 px-4 py-3 font-mono text-sm dark:border-zinc-800">
-				{isLoading && "loading…"}
-				{error && `error: ${error.message}`}
-				{data && data.greeting}
-			</div>
-		</main>
+		<div>
+			<h1 className="mb-6 text-2xl font-semibold">Projects</h1>
+			{isLoading && <p className="text-zinc-500">Loading…</p>}
+			{error && <p className="text-red-600">Error: {(error as Error).message}</p>}
+			{data && data.projects.length === 0 && (
+				<p className="text-zinc-500">
+					No projects yet. Run{" "}
+					<code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:bg-zinc-800">
+						pnpm --filter backend seed
+					</code>{" "}
+					to add demo data.
+				</p>
+			)}
+			{data && data.projects.length > 0 && (
+				<ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+					{data.projects.map((p) => (
+						<li key={p.id} className="py-3">
+							<Link
+								href={`/projects/${p.id}`}
+								className="flex items-baseline justify-between hover:underline"
+							>
+								<span className="font-medium">{p.slug}</span>
+								<span className="text-sm text-zinc-500">
+									{p._count.screens} screens · {p._count.entities} entities ·{" "}
+									{p.defaultLocale.code}
+								</span>
+							</Link>
+						</li>
+					))}
+				</ul>
+			)}
+		</div>
 	);
 }

@@ -1,17 +1,16 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client";
+import { withVersioning, type ExtendedPrismaClient } from "./versioning";
 
 declare global {
-	var __prisma: PrismaClient | undefined;
+	var __prisma: ExtendedPrismaClient | undefined;
 }
 
-function createClient() {
+function createClient(): ExtendedPrismaClient {
 	const connectionString = process.env.DATABASE_URL;
-	if (!connectionString) {
-		throw new Error("DATABASE_URL is not set");
-	}
+	if (!connectionString) throw new Error("DATABASE_URL is not set");
 	const adapter = new PrismaPg({ connectionString });
-	return new PrismaClient({ adapter });
+	return withVersioning(new PrismaClient({ adapter }));
 }
 
 export const prisma = globalThis.__prisma ?? createClient();
