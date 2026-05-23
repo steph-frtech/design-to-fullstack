@@ -1,7 +1,7 @@
 {
   "version": "1",
   "createdBy": "claude-code-up@0.1.5",
-  "createdAt": "2026-05-23T05:58:19.514Z",
+  "createdAt": "2026-05-23T06:04:12.530Z",
   "components": [
     {
       "id": "karpathy",
@@ -112,7 +112,7 @@
           "name": "wshobson agents (file-level extraction)",
           "path": ".claude/agents/",
           "exists": true,
-          "count": 16
+          "count": 17
         }
       ],
       "available": {
@@ -290,7 +290,7 @@
       "files": 3,
       "items": 2054,
       "skills": 16,
-      "agents": 19,
+      "agents": 20,
       "scripts": 2,
       "hooks": 1
     },

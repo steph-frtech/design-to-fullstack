@@ -16,6 +16,82 @@
         "-y",
         "@upstash/context7-mcp"
       ]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp"
+      ]
+    },
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "${POSTGRES_CONNECTION_STRING}"
+      ]
+    },
+    "stripe": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@stripe/agent-toolkit",
+        "--tools=all"
+      ],
+      "env": {
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}"
+      }
+    },
+    "revenuecat": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "github:iamhenry/revenuecat-mcp"
+      ],
+      "env": {
+        "REVENUECAT_API_KEY": "${REVENUECAT_API_KEY}"
+      }
+    },
+    "better-auth": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "github:nahmanmate/better-auth-mcp-server"
+      ]
+    },
+    "dockerhub": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "HUB_PAT_TOKEN",
+        "mcp/dockerhub",
+        "--transport=stdio",
+        "--username=${DOCKERHUB_USERNAME}"
+      ],
+      "env": {
+        "HUB_PAT_TOKEN": "${HUB_PAT_TOKEN}"
+      }
+    },
+    "trivy": {
+      "command": "trivy",
+      "args": [
+        "mcp"
+      ]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase"
+      ],
+      "env": {
+        "SUPABASE_URL": "${SUPABASE_URL}",
+        "SUPABASE_SERVICE_ROLE_KEY": "${SUPABASE_SERVICE_ROLE_KEY}"
+      }
     }
   }
 }

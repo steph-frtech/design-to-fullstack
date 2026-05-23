@@ -1,7 +1,15 @@
 {
-  "verifiedAt": "2026-05-23T05:58:22.090Z",
+  "verifiedAt": "2026-05-23T06:04:19.704Z",
   "servers": {
     "github": "ok",
-    "context7": "ok"
+    "context7": "ok",
+    "playwright": "ok",
+    "postgres": "failed",
+    "stripe": "skipped",
+    "revenuecat": "skipped",
+    "better-auth": "ok",
+    "dockerhub": "skipped",
+    "trivy": "failed",
+    "supabase": "skipped"
   }
 }
