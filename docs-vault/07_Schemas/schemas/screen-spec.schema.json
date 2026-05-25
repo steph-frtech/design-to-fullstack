@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dtfs.dev/schemas/screen-spec",
+  "title": "ScreenSpec",
+  "description": "Input schema for a ScreenSpec record. Derived from screenSpecInputSchema in backend/src/lib/dsl/delta-spec.ts.",
+  "type": "object",
+  "required": ["name", "description"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Screen name (also used as route label)"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What this screen does and why"
+    },
+    "productSpecId": {
+      "type": "string",
+      "description": "FK to ProductSpec this screen belongs to"
+    },
+    "actor": {
+      "type": "string",
+      "description": "Primary user persona interacting with this screen"
+    },
+    "purpose": {
+      "type": "string",
+      "description": "High-level intent of this screen"
+    },
+    "userIntent": {
+      "type": "string",
+      "description": "What the user is trying to accomplish"
+    },
+    "layoutHint": {
+      "type": "string",
+      "description": "Rough layout suggestion (e.g. list-detail, form, dashboard)"
+    },
+    "components": {
+      "type": "array",
+      "items": {},
+      "description": "UI component descriptions"
+    },
+    "fields": {
+      "type": "array",
+      "items": {},
+      "description": "Form fields on this screen"
+    },
+    "actions": {
+      "type": "array",
+      "items": {},
+      "description": "User actions available on this screen"
+    },
+    "dataNeeds": {
+      "type": "array",
+      "items": {},
+      "description": "Data bindings required to render this screen"
+    },
+    "businessRules": {
+      "type": "array",
+      "items": {},
+      "description": "Screen-level business rules and validation"
+    },
+    "emptyStates": {
+      "type": "array",
+      "items": {},
+      "description": "How the screen looks when there is no data"
+    },
+    "errorStates": {
+      "type": "array",
+      "items": {},
+      "description": "Error conditions and how they are surfaced"
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {},
+      "description": "Screen-level assumptions"
+    },
+    "openQuestions": {
+      "type": "array",
+      "items": {},
+      "description": "Screen-level unresolved questions"
+    }
+  }
+}

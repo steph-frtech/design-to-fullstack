@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dtfs.dev/schemas/product-spec",
+  "title": "ProductSpec",
+  "description": "Input schema for a ProductSpec record. Derived from productSpecInputSchema in backend/src/lib/dsl/delta-spec.ts.",
+  "type": "object",
+  "required": ["title", "description"],
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short human-readable title for this product spec"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Full description of the product"
+    },
+    "domain": {
+      "type": "string",
+      "description": "Business domain or vertical (e.g. e-commerce, fintech)"
+    },
+    "targetUsers": {
+      "type": "array",
+      "items": {},
+      "default": [],
+      "description": "User segments this product targets"
+    },
+    "goals": {
+      "type": "array",
+      "items": {},
+      "default": [],
+      "description": "Primary goals of the product"
+    },
+    "nonGoals": {
+      "type": "array",
+      "items": {},
+      "description": "Explicit out-of-scope items"
+    },
+    "personas": {
+      "type": "array",
+      "items": {},
+      "description": "User persona definitions"
+    },
+    "userJourneys": {
+      "type": "array",
+      "items": {},
+      "description": "High-level user journey descriptions"
+    },
+    "businessObjects": {
+      "type": "array",
+      "items": {},
+      "description": "Key business objects / domain entities"
+    },
+    "businessRules": {
+      "type": "array",
+      "items": {},
+      "description": "Constraints and invariants governing the product"
+    },
+    "glossary": {
+      "type": "array",
+      "items": {},
+      "description": "Domain vocabulary definitions"
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {},
+      "description": "Stated assumptions at product-spec level"
+    },
+    "openQuestions": {
+      "type": "array",
+      "items": {},
+      "description": "Unresolved questions at product-spec level"
+    }
+  }
+}

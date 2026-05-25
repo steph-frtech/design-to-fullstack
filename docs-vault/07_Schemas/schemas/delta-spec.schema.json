@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dtfs.dev/schemas/delta-spec",
+  "title": "DeltaSpec",
+  "description": "The canonical write format for all Control Plane mutations. Each bucket is optional and contains create/update/delete arrays. Derived from deltaSpecSchema in backend/src/lib/dsl/delta-spec.ts.",
+  "type": "object",
+  "$defs": {
+    "DeltaBlock": {
+      "type": "object",
+      "description": "Generic create/update/delete block for one DeltaSpec bucket",
+      "properties": {
+        "create": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "update": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" }
+            }
+          }
+        },
+        "delete": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "productSpecs": { "$ref": "#/$defs/DeltaBlock" },
+    "screenSpecs": { "$ref": "#/$defs/DeltaBlock" },
+    "requirements": { "$ref": "#/$defs/DeltaBlock" },
+    "entities": { "$ref": "#/$defs/DeltaBlock" },
+    "attributes": { "$ref": "#/$defs/DeltaBlock" },
+    "relations": { "$ref": "#/$defs/DeltaBlock" },
+    "resources": { "$ref": "#/$defs/DeltaBlock" },
+    "operations": { "$ref": "#/$defs/DeltaBlock" },
+    "policies": { "$ref": "#/$defs/DeltaBlock" },
+    "workflows": { "$ref": "#/$defs/DeltaBlock" },
+    "triggers": { "$ref": "#/$defs/DeltaBlock" },
+    "integrations": { "$ref": "#/$defs/DeltaBlock" },
+    "assets": { "$ref": "#/$defs/DeltaBlock" },
+    "authMethods": { "$ref": "#/$defs/DeltaBlock" },
+    "screens": { "$ref": "#/$defs/DeltaBlock" },
+    "components": { "$ref": "#/$defs/DeltaBlock" },
+    "forms": { "$ref": "#/$defs/DeltaBlock" },
+    "fields": { "$ref": "#/$defs/DeltaBlock" },
+    "actions": { "$ref": "#/$defs/DeltaBlock" },
+    "dataBindings": { "$ref": "#/$defs/DeltaBlock" },
+    "testScenarios": { "$ref": "#/$defs/DeltaBlock" }
+  }
+}

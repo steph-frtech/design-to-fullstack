@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dtfs.dev/schemas/frontend-contract",
+  "title": "FrontendContract",
+  "description": "Compiled description of everything the Next.js frontend must render: routes, pages, components, forms, data-bindings, actions, auth guards. Design doc source: docs/FRONTEND_CONTRACT.md.",
+  "type": "object",
+  "required": ["id", "projectId", "routes", "pages", "components", "forms", "dataBindings", "actions"],
+  "additionalProperties": false,
+  "$defs": {
+    "RouteDescriptor": {
+      "type": "object",
+      "required": ["path", "nextPath", "pageId"],
+      "properties": {
+        "path": { "type": "string", "description": "URL path" },
+        "nextPath": { "type": "string", "description": "File path relative to apps/web/ (e.g. app/customers/[id]/page.tsx)" },
+        "pageId": { "type": "string" },
+        "authGuard": { "type": "string" },
+        "source": { "type": "object" }
+      }
+    },
+    "PageDescriptor": {
+      "type": "object",
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "layoutId": { "type": "string" },
+        "authGuard": { "type": "string" },
+        "dataNeeds": { "type": "array", "items": { "type": "object" } },
+        "components": { "type": "array", "items": { "type": "string" } },
+        "source": { "type": "object" }
+      }
+    },
+    "ComponentDescriptor": {
+      "type": "object",
+      "required": ["id", "name", "kind"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["server", "client", "form", "layout", "data"]
+        },
+        "props": { "type": "array", "items": { "type": "object" } },
+        "children": { "type": "array", "items": { "type": "string" } },
+        "source": { "type": "object" }
+      }
+    },
+    "FormDescriptor": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "operationId": { "type": "string" },
+        "fields": { "type": "array", "items": { "type": "object" } },
+        "submitAction": { "type": "object" },
+        "successRedirect": { "type": "string" },
+        "source": { "type": "object" }
+      }
+    },
+    "DataBindingDescriptor": {
+      "type": "object",
+      "required": ["id", "strategy", "endpoint"],
+      "properties": {
+        "id": { "type": "string" },
+        "strategy": {
+          "type": "string",
+          "enum": ["server-fetch", "client-query", "props"]
+        },
+        "endpoint": { "type": "string" },
+        "params": { "type": "object" },
+        "resultSchema": { "type": "string" },
+        "loadingState": { "type": "string" },
+        "emptyState": { "type": "string" },
+        "source": { "type": "object" }
+      }
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "CUID primary key"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "FK to Project"
+    },
+    "runtimeTargetId": {
+      "type": ["string", "null"],
+      "description": "FK to RuntimeTarget"
+    },
+    "routes": {
+      "type": "array",
+      "description": "Next.js route path descriptors",
+      "items": { "$ref": "#/$defs/RouteDescriptor" }
+    },
+    "pages": {
+      "type": "array",
+      "description": "Per-page configs: layout, auth-guard, data needs",
+      "items": { "$ref": "#/$defs/PageDescriptor" }
+    },
+    "layouts": {
+      "type": "array",
+      "description": "Shared layout descriptors",
+      "items": { "type": "object" }
+    },
+    "components": {
+      "type": "array",
+      "description": "Component stubs by kind (server / client / form / layout / data)",
+      "items": { "$ref": "#/$defs/ComponentDescriptor" }
+    },
+    "forms": {
+      "type": "array",
+      "description": "Form + Zod validation + submit action descriptors",
+      "items": { "$ref": "#/$defs/FormDescriptor" }
+    },
+    "dataBindings": {
+      "type": "array",
+      "description": "Fetch / TanStack Query / props-mapping descriptors",
+      "items": { "$ref": "#/$defs/DataBindingDescriptor" }
+    },
+    "actions": {
+      "type": "array",
+      "description": "Button / link / form-submit / server-action / API-mutation descriptors",
+      "items": { "type": "object" }
+    },
+    "authGuards": {
+      "type": "array",
+      "description": "Per-page auth guard configuration",
+      "items": {
+        "type": "object",
+        "required": ["pageId", "require"],
+        "properties": {
+          "pageId": { "type": "string" },
+          "require": { "type": "string", "enum": ["session", "role"] },
+          "redirectTo": { "type": "string" },
+          "role": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "generatedFrom": {
+      "type": ["object", "null"],
+      "description": "Provenance: which Control Plane IDs contributed",
+      "properties": {
+        "screens": { "type": "array", "items": { "type": "string" } },
+        "components": { "type": "array", "items": { "type": "string" } },
+        "forms": { "type": "array", "items": { "type": "string" } },
+        "fields": { "type": "array", "items": { "type": "string" } },
+        "actions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

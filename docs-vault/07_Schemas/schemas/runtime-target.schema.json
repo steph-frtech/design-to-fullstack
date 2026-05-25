@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dtfs.dev/schemas/runtime-target",
+  "title": "RuntimeTarget",
+  "description": "Declares the concrete technology stack a project will generate code for. Design doc source: docs/RUNTIME_TARGET.md.",
+  "type": "object",
+  "required": ["id", "projectId", "name", "backend", "frontend", "auth", "database"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "CUID primary key"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "FK to Project (cascade delete)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Target name — 'default' for the primary target",
+      "examples": ["default", "hono-next", "edge"]
+    },
+    "backend": {
+      "type": "object",
+      "description": "Backend framework and version configuration",
+      "required": ["framework", "versionPolicy", "runtime", "apiStyle"],
+      "additionalProperties": false,
+      "properties": {
+        "framework": {
+          "type": "string",
+          "description": "Backend framework identifier",
+          "examples": ["hono"]
+        },
+        "versionPolicy": {
+          "type": "string",
+          "description": "SemVer range or version policy",
+          "examples": ["~4.12"]
+        },
+        "runtime": {
+          "type": "string",
+          "description": "Node runtime environment",
+          "enum": ["node", "bun", "edge"]
+        },
+        "apiStyle": {
+          "type": "string",
+          "description": "API architectural style",
+          "enum": ["rest", "rpc"]
+        }
+      }
+    },
+    "frontend": {
+      "type": "object",
+      "description": "Frontend framework and rendering configuration",
+      "required": ["framework", "version", "router", "rendering"],
+      "additionalProperties": false,
+      "properties": {
+        "framework": {
+          "type": "string",
+          "description": "Frontend framework identifier",
+          "examples": ["next", "remix", "nuxt"]
+        },
+        "version": {
+          "type": "string",
+          "description": "Framework version",
+          "examples": ["16.x"]
+        },
+        "router": {
+          "type": "string",
+          "description": "Router mode",
+          "enum": ["app", "pages"]
+        },
+        "rendering": {
+          "type": "string",
+          "description": "Default rendering strategy",
+          "enum": ["server-components-first", "client-first", "ssr", "ssg"]
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "description": "Authentication provider configuration",
+      "required": ["provider", "basePath"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Auth provider identifier",
+          "examples": ["better-auth", "next-auth", "clerk"]
+        },
+        "basePath": {
+          "type": "string",
+          "description": "Mount path for auth routes",
+          "examples": ["/api/auth"]
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "description": "Database provider and ORM configuration",
+      "required": ["provider", "orm"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Database provider",
+          "enum": ["postgresql", "mysql", "sqlite"]
+        },
+        "orm": {
+          "type": "string",
+          "description": "ORM / query builder",
+          "enum": ["prisma", "drizzle", "typeorm"]
+        }
+      }
+    },
+    "packageManager": {
+      "type": "string",
+      "description": "Package manager for the generated monorepo",
+      "enum": ["pnpm", "bun", "npm"],
+      "default": "pnpm"
+    },
+    "runtime": {
+      "type": "string",
+      "description": "Node runtime for the generated application",
+      "enum": ["node", "bun", "edge"],
+      "default": "node"
+    },
+    "config": {
+      "type": "object",
+      "description": "Arbitrary key-value overrides for emitter-specific knobs"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

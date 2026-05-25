@@ -1,0 +1,949 @@
+openapi: "3.1.0"
+info:
+  title: DTFS Control Plane API
+  version: "0.26.0"
+  description: >
+    REST API of the Design-to-Fullstack Control Plane (Hono backend on :4002).
+    This spec is a documentation-level cadrage — paths and schemas are enriched
+    progressively as the Control Plane stabilises. See docs/HTTP_API.md for the
+    canonical source of truth.
+
+servers:
+  - url: http://localhost:4002
+    description: Local development
+
+tags:
+  - name: projects
+    description: Project lifecycle
+  - name: spec
+    description: Spec snapshots and revision history
+  - name: changesets
+    description: ChangeSet lifecycle (draft → committed → reverted)
+  - name: delta
+    description: DeltaSpec operations — the write path for all Control Plane mutations
+  - name: concepts
+    description: Concept CRUD (ProductSpec, ScreenSpec, Entity, Resource, Operation, Policy, …)
+  - name: contracts
+    description: Runtime contracts compilation (Phase 26+)
+  - name: system
+    description: System utilities and behaviour catalogue
+
+paths:
+
+  /api/projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all projects
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [projects]
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [project]
+                properties:
+                  project:
+                    $ref: "#/components/schemas/Project"
+
+  /api/projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get project by id
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [project]
+                properties:
+                  project:
+                    $ref: "#/components/schemas/Project"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/projects/{id}/spec:
+    get:
+      operationId: getProjectSpec
+      tags: [spec]
+      summary: Full project spec as JSON
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [spec]
+                properties:
+                  spec:
+                    type: object
+                    description: Full spec snapshot (shape varies by project state)
+
+  /api/projects/{id}/spec.md:
+    get:
+      operationId: getProjectSpecMarkdown
+      tags: [spec]
+      summary: Full project spec as Markdown
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: OK
+          content:
+            text/markdown:
+              schema:
+                type: string
+
+  /api/projects/{id}/revision-at:
+    get:
+      operationId: getRevisionAt
+      tags: [spec]
+      summary: Spec state at a given version number
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - name: version
+          in: query
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+              - type: string
+                enum: [latest]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [spec]
+                properties:
+                  spec:
+                    type: object
+
+  /api/projects/{id}/changesets:
+    get:
+      operationId: listChangeSets
+      tags: [changesets]
+      summary: List changesets for a project
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: before
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChangeSet"
+    post:
+      operationId: createChangeSet
+      tags: [changesets]
+      summary: Create a DRAFT changeset
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [changeSet]
+                properties:
+                  changeSet:
+                    $ref: "#/components/schemas/ChangeSet"
+
+  /api/projects/{id}/changesets/{csid}:
+    get:
+      operationId: getChangeSet
+      tags: [changesets]
+      summary: Get changeset with its revisions
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/changeSetId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [changeSet]
+                properties:
+                  changeSet:
+                    $ref: "#/components/schemas/ChangeSet"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: discardChangeSet
+      tags: [changesets]
+      summary: Discard a DRAFT changeset
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/changeSetId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+
+  /api/projects/{id}/changesets/{csid}/commit:
+    post:
+      operationId: commitChangeSet
+      tags: [changesets]
+      summary: Commit a DRAFT changeset
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/changeSetId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [changeSet]
+                properties:
+                  changeSet:
+                    $ref: "#/components/schemas/ChangeSet"
+
+  /api/projects/{id}/changesets/{csid}/revert:
+    post:
+      operationId: revertChangeSet
+      tags: [changesets]
+      summary: Revert a committed changeset
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+        - $ref: "#/components/parameters/changeSetId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [changeSet, entries]
+                properties:
+                  changeSet:
+                    $ref: "#/components/schemas/ChangeSet"
+                  entries:
+                    type: array
+                    items:
+                      type: object
+
+  /api/projects/{id}/changesets/apply:
+    post:
+      operationId: applyChangeSetDelta
+      tags: [changesets]
+      summary: Apply a DeltaSpec inside an existing changeset
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [changeSetId, deltaSpec]
+              properties:
+                changeSetId:
+                  type: string
+                deltaSpec:
+                  $ref: "#/components/schemas/DeltaSpec"
+                dryRun:
+                  type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplyResult"
+
+  /api/projects/{id}/delta-spec/validate:
+    post:
+      operationId: validateDeltaSpec
+      tags: [delta]
+      summary: Validate a DeltaSpec against the current project state
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deltaSpec]
+              properties:
+                deltaSpec:
+                  $ref: "#/components/schemas/DeltaSpec"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                  errors:
+                    type: array
+                    items:
+                      type: string
+
+  /api/projects/{id}/delta-spec/apply:
+    post:
+      operationId: applyDeltaSpec
+      tags: [delta]
+      summary: Apply a DeltaSpec (creates a new ChangeSet automatically)
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deltaSpec]
+              properties:
+                deltaSpec:
+                  $ref: "#/components/schemas/DeltaSpec"
+                message:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplyResult"
+
+  /api/projects/{id}/delta-spec/from-proposal:
+    post:
+      operationId: deltaSpecFromProposal
+      tags: [delta]
+      summary: Compile a DeltaSpec from an existing PlatformSpecProposal
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [proposalId]
+              properties:
+                proposalId:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deltaSpec]
+                properties:
+                  deltaSpec:
+                    $ref: "#/components/schemas/DeltaSpec"
+
+  /api/projects/{id}/delta-spec/explain:
+    post:
+      operationId: explainDeltaSpec
+      tags: [delta]
+      summary: Human-readable Markdown explanation of a DeltaSpec
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deltaSpec]
+              properties:
+                deltaSpec:
+                  $ref: "#/components/schemas/DeltaSpec"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [markdown]
+                properties:
+                  markdown:
+                    type: string
+
+  /api/projects/{id}/product-specs:
+    get:
+      operationId: listProductSpecs
+      tags: [concepts]
+      summary: List ProductSpec records for a project
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProductSpec"
+    post:
+      operationId: createProductSpec
+      tags: [concepts]
+      summary: Create a ProductSpec
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductSpecInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [productSpec]
+                properties:
+                  productSpec:
+                    $ref: "#/components/schemas/ProductSpec"
+
+  /api/projects/{id}/screen-specs:
+    get:
+      operationId: listScreenSpecs
+      tags: [concepts]
+      summary: List ScreenSpec records for a project
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ScreenSpec"
+    post:
+      operationId: createScreenSpec
+      tags: [concepts]
+      summary: Create a ScreenSpec
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScreenSpecInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [screenSpec]
+                properties:
+                  screenSpec:
+                    $ref: "#/components/schemas/ScreenSpec"
+
+  /api/projects/{id}/runtime-target:
+    get:
+      operationId: getRuntimeTarget
+      tags: [contracts]
+      summary: Get the RuntimeTarget for a project
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runtimeTarget]
+                properties:
+                  runtimeTarget:
+                    $ref: "#/components/schemas/RuntimeTarget"
+    put:
+      operationId: setRuntimeTarget
+      tags: [contracts]
+      summary: Set or update the RuntimeTarget
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuntimeTarget"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runtimeTarget]
+                properties:
+                  runtimeTarget:
+                    $ref: "#/components/schemas/RuntimeTarget"
+
+  /api/projects/{id}/contracts/backend:
+    post:
+      operationId: compileBackendContract
+      tags: [contracts]
+      summary: Compile the BackendContract for a project
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [backendContract]
+                properties:
+                  backendContract:
+                    $ref: "#/components/schemas/BackendContract"
+
+  /api/projects/{id}/contracts/frontend:
+    post:
+      operationId: compileFrontendContract
+      tags: [contracts]
+      summary: Compile the FrontendContract for a project
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [frontendContract]
+                properties:
+                  frontendContract:
+                    $ref: "#/components/schemas/FrontendContract"
+
+  /api/projects/{id}/contracts/shared:
+    post:
+      operationId: compileSharedContract
+      tags: [contracts]
+      summary: Compile the SharedContract for a project
+      parameters:
+        - $ref: "#/components/parameters/projectId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sharedContract]
+                properties:
+                  sharedContract:
+                    $ref: "#/components/schemas/SharedContract"
+
+  /api/behaviors:
+    get:
+      operationId: listBehaviorCatalogue
+      tags: [system]
+      summary: List available behaviour catalogue entries
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [behaviors]
+                properties:
+                  behaviors:
+                    type: array
+                    items:
+                      type: object
+
+  /api/system/prepare-identity:
+    post:
+      operationId: prepareIdentity
+      tags: [system]
+      summary: Scaffold local path and/or GitHub repo for a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                projectId:
+                  type: string
+                localPath:
+                  type: string
+                github:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+
+  parameters:
+    projectId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Project CUID
+    changeSetId:
+      name: csid
+      in: path
+      required: true
+      schema:
+        type: string
+      description: ChangeSet CUID
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+
+  schemas:
+
+    Project:
+      type: object
+      description: A DTFS project (placeholder — enriched progressively)
+      required: [id, slug, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        localeCode:
+          type: string
+        localeName:
+          type: string
+        localPath:
+          type: ["string", "null"]
+        github:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateProjectInput:
+      type: object
+      required: [slug]
+      properties:
+        slug:
+          type: string
+        localeCode:
+          type: string
+        localeName:
+          type: string
+        extraLocales:
+          type: array
+          items:
+            type: object
+        localPath:
+          type: string
+        github:
+          type: string
+        screenTypes:
+          type: array
+          items:
+            type: string
+
+    ChangeSet:
+      type: object
+      description: A ChangeSet groups one or more Revisions under a single message
+      required: [id, projectId, message, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        message:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, COMMITTED, REVERTED]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    DeltaSpec:
+      type: object
+      description: >
+        The canonical write format for all Control Plane mutations.
+        Each bucket is optional and contains create/update/delete arrays.
+        See docs-vault/07_Schemas/schemas/delta-spec.schema.json for the full schema.
+      properties:
+        productSpecs:
+          $ref: "#/components/schemas/DeltaBlock"
+        screenSpecs:
+          $ref: "#/components/schemas/DeltaBlock"
+        requirements:
+          $ref: "#/components/schemas/DeltaBlock"
+        entities:
+          $ref: "#/components/schemas/DeltaBlock"
+        attributes:
+          $ref: "#/components/schemas/DeltaBlock"
+        relations:
+          $ref: "#/components/schemas/DeltaBlock"
+        resources:
+          $ref: "#/components/schemas/DeltaBlock"
+        operations:
+          $ref: "#/components/schemas/DeltaBlock"
+        policies:
+          $ref: "#/components/schemas/DeltaBlock"
+        workflows:
+          $ref: "#/components/schemas/DeltaBlock"
+        triggers:
+          $ref: "#/components/schemas/DeltaBlock"
+        integrations:
+          $ref: "#/components/schemas/DeltaBlock"
+        assets:
+          $ref: "#/components/schemas/DeltaBlock"
+        authMethods:
+          $ref: "#/components/schemas/DeltaBlock"
+        screens:
+          $ref: "#/components/schemas/DeltaBlock"
+        components:
+          $ref: "#/components/schemas/DeltaBlock"
+        forms:
+          $ref: "#/components/schemas/DeltaBlock"
+        fields:
+          $ref: "#/components/schemas/DeltaBlock"
+        actions:
+          $ref: "#/components/schemas/DeltaBlock"
+        dataBindings:
+          $ref: "#/components/schemas/DeltaBlock"
+        testScenarios:
+          $ref: "#/components/schemas/DeltaBlock"
+
+    DeltaBlock:
+      type: object
+      description: Generic create/update/delete block for one DeltaSpec bucket
+      properties:
+        create:
+          type: array
+          items:
+            type: object
+        update:
+          type: array
+          items:
+            type: object
+        delete:
+          type: array
+          items:
+            type: object
+            required: [id]
+            properties:
+              id:
+                type: string
+
+    ApplyResult:
+      type: object
+      required: [ok, changeSetId]
+      properties:
+        ok:
+          type: boolean
+        changeSetId:
+          type: string
+        applied:
+          type: integer
+        createdIds:
+          type: object
+          description: Map of bucket name to array of created IDs
+        skipped:
+          type: integer
+
+    ProductSpec:
+      type: object
+      description: ProductSpec record (placeholder)
+      required: [id, projectId, title, description]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+
+    ProductSpecInput:
+      type: object
+      required: [title, description]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        domain:
+          type: string
+        targetUsers:
+          type: array
+          items: {}
+        goals:
+          type: array
+          items: {}
+
+    ScreenSpec:
+      type: object
+      description: ScreenSpec record (placeholder)
+      required: [id, projectId, name, description]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+
+    ScreenSpecInput:
+      type: object
+      required: [name, description]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        actor:
+          type: string
+        purpose:
+          type: string
+
+    RuntimeTarget:
+      description: >
+        Declares the concrete tech stack for code generation.
+        See docs-vault/07_Schemas/schemas/runtime-target.schema.json for the full schema.
+      $ref: "../../07_Schemas/schemas/runtime-target.schema.json"
+
+    BackendContract:
+      description: >
+        Compiled description of everything the backend must expose.
+        See docs-vault/07_Schemas/schemas/backend-contract.schema.json.
+      $ref: "../../07_Schemas/schemas/backend-contract.schema.json"
+
+    FrontendContract:
+      description: >
+        Compiled description of everything the frontend must render.
+        See docs-vault/07_Schemas/schemas/frontend-contract.schema.json.
+      $ref: "../../07_Schemas/schemas/frontend-contract.schema.json"
+
+    SharedContract:
+      description: >
+        Bridge types shared between backend and frontend.
+        See docs-vault/07_Schemas/schemas/shared-contract.schema.json.
+      $ref: "../../07_Schemas/schemas/shared-contract.schema.json"
+
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        hint:
+          type: string
+        id:
+          type: string

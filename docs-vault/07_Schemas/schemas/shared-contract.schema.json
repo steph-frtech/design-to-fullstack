@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dtfs.dev/schemas/shared-contract",
+  "title": "SharedContract",
+  "description": "Bridge between backend and frontend: TypeScript types, Zod schemas, API client surface, error codes, event payloads — all shared between apps/api/ and apps/web/. Design doc source: docs/SHARED_CONTRACT.md.",
+  "type": "object",
+  "required": ["id", "projectId", "types", "schemas"],
+  "additionalProperties": false,
+  "$defs": {
+    "TypeDescriptor": {
+      "type": "object",
+      "required": ["name", "kind", "typescript"],
+      "properties": {
+        "name": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["entity", "input", "output", "error", "session", "role", "event"]
+        },
+        "typescript": {
+          "type": "string",
+          "description": "TypeScript interface/type declaration as a string"
+        },
+        "source": { "type": "object" }
+      }
+    },
+    "ZodSchemaDescriptor": {
+      "type": "object",
+      "required": ["name", "kind", "zod"],
+      "properties": {
+        "name": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["entity", "input", "output"]
+        },
+        "zod": {
+          "type": "string",
+          "description": "Exported Zod schema declaration as a string"
+        },
+        "source": { "type": "object" }
+      }
+    },
+    "ApiClientDescriptor": {
+      "type": "object",
+      "required": ["name", "method", "path", "signature"],
+      "properties": {
+        "name": { "type": "string" },
+        "method": { "type": "string", "enum": ["GET", "POST", "PATCH", "PUT", "DELETE"] },
+        "path": { "type": "string" },
+        "params": { "type": "object" },
+        "inputSchema": { "type": ["string", "null"] },
+        "outputSchema": { "type": "string" },
+        "signature": { "type": "string", "description": "Full TypeScript function signature" },
+        "source": { "type": "object" }
+      }
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "CUID primary key"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "FK to Project"
+    },
+    "types": {
+      "type": "array",
+      "description": "TypeScript type and interface declarations for all entities, DTOs, and API response shapes",
+      "items": { "$ref": "#/$defs/TypeDescriptor" }
+    },
+    "schemas": {
+      "type": "array",
+      "description": "Zod schema declarations for input/output validation",
+      "items": { "$ref": "#/$defs/ZodSchemaDescriptor" }
+    },
+    "apiClient": {
+      "type": "array",
+      "description": "Typed API client function signatures (the SDK surface)",
+      "items": { "$ref": "#/$defs/ApiClientDescriptor" }
+    },
+    "errors": {
+      "type": ["object", "null"],
+      "description": "Error code enum definition and per-code shape types",
+      "properties": {
+        "enum": { "type": "string", "description": "TypeScript ErrorCode union type as a string" },
+        "types": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code", "shape"],
+            "properties": {
+              "code": { "type": "string" },
+              "shape": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "description": "Event payload type definitions for EventDefinition rows",
+      "items": {
+        "type": "object",
+        "required": ["name", "typescript", "zod"],
+        "properties": {
+          "name": { "type": "string" },
+          "typescript": { "type": "string" },
+          "zod": { "type": "string" },
+          "source": { "type": "object" }
+        }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

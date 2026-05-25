@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dtfs.dev/schemas/backend-contract",
+  "title": "BackendContract",
+  "description": "Compiled description of everything the backend must expose: API routes, Zod schemas, auth config, policies, errors. Design doc source: docs/BACKEND_CONTRACT.md.",
+  "type": "object",
+  "required": ["id", "projectId", "apiBasePath", "routes", "schemas"],
+  "additionalProperties": false,
+  "$defs": {
+    "RouteDescriptor": {
+      "type": "object",
+      "required": ["method", "path", "kind", "operationId"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PATCH", "PUT", "DELETE"]
+        },
+        "path": {
+          "type": "string",
+          "description": "URL path with :param placeholders",
+          "examples": ["/api/customers/:id"]
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["resource", "operation", "auth", "asset", "system"]
+        },
+        "operationId": {
+          "type": "string",
+          "description": "Unique camelCase identifier"
+        },
+        "inputSchema": {
+          "type": "string",
+          "description": "Ref to schemas[] by name"
+        },
+        "outputSchema": {
+          "type": "string",
+          "description": "Ref to schemas[] by name"
+        },
+        "middlewares": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Refs to middlewares[] by name"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string" },
+            "id": { "type": "string" }
+          }
+        }
+      }
+    },
+    "SchemaDescriptor": {
+      "type": "object",
+      "required": ["name", "kind"],
+      "properties": {
+        "name": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["entity", "input", "output", "dto", "error"]
+        },
+        "zod": {
+          "type": "string",
+          "description": "Zod schema expression as a TypeScript string"
+        },
+        "typescript": {
+          "type": "string",
+          "description": "TypeScript type declaration as a string"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string" },
+            "id": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "CUID primary key"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "FK to Project"
+    },
+    "runtimeTargetId": {
+      "type": ["string", "null"],
+      "description": "FK to RuntimeTarget; if null, uses the project default"
+    },
+    "apiBasePath": {
+      "type": "string",
+      "description": "Root path for all API routes",
+      "default": "/api"
+    },
+    "routes": {
+      "type": "array",
+      "description": "One RouteDescriptor per Resource route family and Operation endpoint",
+      "items": { "$ref": "#/$defs/RouteDescriptor" }
+    },
+    "schemas": {
+      "type": "array",
+      "description": "Zod schemas and TypeScript types for all entities and DTOs",
+      "items": { "$ref": "#/$defs/SchemaDescriptor" }
+    },
+    "middlewares": {
+      "type": "array",
+      "description": "Auth, policy, CORS, rate-limit middleware descriptors",
+      "items": { "type": "object" }
+    },
+    "auth": {
+      "type": ["object", "null"],
+      "description": "Better Auth config fragment",
+      "properties": {
+        "provider": { "type": "string" },
+        "basePath": { "type": "string" },
+        "emailPassword": { "type": "boolean" },
+        "sessionDuration": { "type": "integer" },
+        "tables": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "middleware": { "type": "string" }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "description": "Error code catalog",
+      "items": {
+        "type": "object",
+        "required": ["code", "httpStatus"],
+        "properties": {
+          "code": { "type": "string" },
+          "httpStatus": { "type": "integer" },
+          "shape": { "type": "string" }
+        }
+      }
+    },
+    "generatedFrom": {
+      "type": ["object", "null"],
+      "description": "Provenance record: which Control Plane IDs contributed",
+      "properties": {
+        "entities": { "type": "array", "items": { "type": "string" } },
+        "operations": { "type": "array", "items": { "type": "string" } },
+        "policies": { "type": "array", "items": { "type": "string" } },
+        "authMethods": { "type": "array", "items": { "type": "string" } },
+        "resources": { "type": "array", "items": { "type": "string" } },
+        "assets": { "type": "array", "items": { "type": "string" } },
+        "events": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
