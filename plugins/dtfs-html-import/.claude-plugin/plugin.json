@@ -1,0 +1,7 @@
+{
+  "name": "dtfs-html-import",
+  "version": "0.1.0",
+  "description": "Import HTML mockups or design exports into ScreenSpec format. Wraps the dtfs-screen-spec-writer agent with an HTML-aware import command.",
+  "author": "dtfs",
+  "keywords": ["dtfs", "html", "import", "mockup", "design", "screen-spec"]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "dtfs-natural-spec",
+  "version": "0.1.0",
+  "description": "Natural language to structured spec: product analyst (Phase 1), screen spec writer (Phase 2), question manager (Phase 3). Turns prose descriptions into ProductSpec and ScreenSpec DB records.",
+  "author": "dtfs",
+  "keywords": ["dtfs", "natural-language", "product-spec", "screen-spec", "clarification", "phases-1-3"]
+}

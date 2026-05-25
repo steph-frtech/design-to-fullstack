@@ -1,0 +1,7 @@
+{
+  "name": "dtfs-core",
+  "version": "0.1.0",
+  "description": "Core transversal commands (status, apply), guard hook enforcing ChangeSet gate, and MCP server pointer. Required by all other dtfs plugins.",
+  "author": "dtfs",
+  "keywords": ["dtfs", "core", "mcp", "changeset", "guard", "status", "apply"]
+}

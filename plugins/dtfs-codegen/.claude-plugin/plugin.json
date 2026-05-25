@@ -1,0 +1,7 @@
+{
+  "name": "dtfs-codegen",
+  "version": "0.1.0",
+  "description": "Code generation reference and generate_app tool documentation. Documents what the codegen guarantees and how to invoke it after a DeltaSpec is applied.",
+  "author": "dtfs",
+  "keywords": ["dtfs", "codegen", "code-generation", "generate-app", "scaffold"]
+}

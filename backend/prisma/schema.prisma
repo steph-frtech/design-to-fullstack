@@ -33,6 +33,9 @@ model User {
   accounts   Account[]
   projects   Project[]
   revisions  Revision[]
+  changeSets ChangeSet[]
+  auditLogs  AuditLog[]
+  assets     Asset[]
 
   @@schema("dtfs")
 }
@@ -135,22 +138,59 @@ model Translation {
 // ════════════════════════════════════════════════════════════════════════
 
 model Project {
-  id              String   @id @default(cuid())
-  slug            String   @unique
-  nameKey         String? // -> TextKey.namespace
-  ownerId         String
-  defaultLocaleId String
-  currentVersion  Int      @default(1)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  slug               String   @unique
+  nameKey            String? // -> TextKey.namespace
+  ownerId            String
+  defaultLocaleId    String
+  // captured at creation time by the new-project wizard
+  localPath          String?  // absolute path on disk, confined to PROJECTS_BASE_DIR
+  githubRepo         String?  // "owner/name"
+  enabledScreenTypes String[] @default([])  // subset of ["web", "mobile", "desktop"]
+  currentVersion     Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  defaultLocale Locale          @relation("ProjectDefaultLocale", fields: [defaultLocaleId], references: [id])
-  locales       ProjectLocale[]
-  theme         Theme?
-  entities      Entity[]
-  screens       Screen[]
-  textKeys      TextKey[]
+  owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  defaultLocale   Locale            @relation("ProjectDefaultLocale", fields: [defaultLocaleId], references: [id])
+  locales         ProjectLocale[]
+  theme           Theme?
+  entities        Entity[]
+  screens         Screen[]
+  textKeys        TextKey[]
+  // Control Plane V1 — back-relations to the new concepts
+  entityRelations EntityRelation[]
+  resources       Resource[]
+  operations      Operation[]
+  policies        Policy[]
+  integrations    Integration[]
+  triggers        Trigger[]
+  behaviors       Behavior[]
+  changeSets      ChangeSet[]
+  // Phase 0 — pipeline skeleton placeholders
+  productSpecs       ProductSpec[]
+  screenSpecs        ScreenSpec[]
+  openQuestions      OpenQuestion[]
+  assumptions        Assumption[]
+  specArtifacts      SpecArtifact[]
+  requirements       Requirement[]
+  workflows          Workflow[]
+  assets             Asset[]
+  authMethods        AuthMethod[]
+  secrets            Secret[]
+  environments       Environment[]
+  appRoles           AppRole[]
+  eventDefinitions   EventDefinition[]
+  actions            Action[]
+  dataBindings       DataBinding[]
+  generatedArtifacts GeneratedArtifact[]
+  deploymentTargets  DeploymentTarget[]
+  testScenarios      TestScenario[]
+  auditLogs          AuditLog[]
+  // Phase 6
+  platformProposals  PlatformSpecProposal[]
+  // Step 25 — Runtime / Contracts
+  runtimeTargets     RuntimeTarget[]
 
   @@schema("dtfs")
 }
@@ -192,10 +232,16 @@ model Entity {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  project    Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  attributes Attribute[]
-  forms      Form[]
-  records    EntityRecord[]
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  attributes    Attribute[]
+  forms         Form[]
+  records       EntityRecord[]
+  // Control Plane V1
+  relationsFrom EntityRelation[]  @relation("RelFrom")
+  relationsTo   EntityRelation[]  @relation("RelTo")
+  resources     Resource[]
+  behaviors     Behavior[]
+  policies      Policy[]
 
   @@unique([projectId, name])
   @@schema("dtfs")
@@ -267,10 +313,11 @@ model Component {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  screen   Screen?     @relation(fields: [screenId], references: [id], onDelete: Cascade)
-  parent   Component?  @relation("ComponentTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children Component[] @relation("ComponentTree")
-  form     Form?
+  screen        Screen?       @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  parent        Component?    @relation("ComponentTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children      Component[]   @relation("ComponentTree")
+  form          Form?
+  dataBindings  DataBinding[]
 
   @@index([screenId])
   @@index([parentId])
@@ -280,14 +327,28 @@ model Component {
 model Form {
   id             String   @id @default(cuid())
   componentId    String   @unique
+  /// Deprecated: prefer Form.operationId. Kept for backward compat.
   entityId       String?
   submitKey      String? // i18n key for submit button
+  /// Operation called on submit. If null, fallback to entityId+CRUD.
+  operationId    String?
+  /// Form fields → Operation input. JSONata expressions per input key.
+  /// JSON shape: Record<string, string>  ex. {"title": "$.form.title"}
+  inputMapping   Json?
+  /// What to do after success. JSON shape:
+  ///   { kind: "navigate"; to: string }
+  /// | { kind: "toast"; messageKey: string }
+  /// | { kind: "stay" }
+  onSuccess      Json?
+  /// Same shape as onSuccess, applied on error.
+  onError        Json?
   currentVersion Int      @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
-  entity    Entity?   @relation(fields: [entityId], references: [id])
+  component Component  @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  entity    Entity?    @relation(fields: [entityId], references: [id])
+  operation Operation? @relation(fields: [operationId], references: [id])
   fields    Field[]
 
   @@schema("dtfs")
@@ -363,24 +424,28 @@ enum FieldType {
 // ════════════════════════════════════════════════════════════════════════
 
 model Revision {
-  id         String      @id @default(cuid())
-  entityType String // model name, e.g. "Screen", "Field"
-  entityId   String
-  version    Int
-  op         RevisionOp
+  id          String      @id @default(cuid())
+  entityType  String // model name, e.g. "Screen", "Field"
+  entityId    String
+  version     Int
+  op          RevisionOp
   // full snapshot of the row at this version (post-mutation state)
-  data       Json
+  data        Json
   // optional diff of changed fields {field: [before, after]}
-  diff       Json?
-  actorId    String?
-  message    String?
-  createdAt  DateTime    @default(now())
+  diff        Json?
+  actorId     String?
+  message     String?
+  /// Logical group this revision belongs to (Control Plane V1).
+  changeSetId String?
+  createdAt   DateTime    @default(now())
 
-  actor User? @relation(fields: [actorId], references: [id])
+  actor     User?      @relation(fields: [actorId], references: [id])
+  changeSet ChangeSet? @relation(fields: [changeSetId], references: [id])
 
   @@unique([entityType, entityId, version])
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([changeSetId])
   @@schema("dtfs")
 }
 
@@ -389,6 +454,1008 @@ enum RevisionOp {
   UPDATE
   DELETE
   RESTORE
+
+  @@schema("dtfs")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// dtfs — Control Plane V1: backend concepts
+// ════════════════════════════════════════════════════════════════════════
+
+/// Relation between two Entities. Modeled separately because relations are
+/// asymmetric: one side carries the foreign key. Drives FK generation,
+/// query joins, and cascade rules in the Generated App.
+model EntityRelation {
+  id             String       @id @default(cuid())
+  projectId      String
+  fromEntityId   String
+  toEntityId     String
+  /// Name used in the generated code (e.g. "list", "items", "owner").
+  name           String
+  kind           RelationKind
+  /// FK field on the "from" side (auto-created if absent).
+  fromField      String?
+  /// Field referenced on the "to" side — defaults to `id`.
+  toField        String?
+  required       Boolean      @default(false)
+  /// Cascade policy. JSON shape: { onDelete: "CASCADE"|"SET_NULL"|"RESTRICT" }
+  cascade        Json?
+  currentVersion Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromEntity Entity  @relation("RelFrom", fields: [fromEntityId], references: [id], onDelete: Cascade)
+  toEntity   Entity  @relation("RelTo", fields: [toEntityId], references: [id], onDelete: Cascade)
+
+  @@schema("dtfs")
+}
+
+enum RelationKind {
+  ONE_TO_ONE
+  ONE_TO_MANY
+  MANY_TO_MANY
+
+  @@schema("dtfs")
+}
+
+/// CRUD-style API exposure of an Entity. An Entity can have 0 or 1 Resource
+/// (private vs public). The LLM derives REST endpoints from exposedOps +
+/// queryConfig — no guessing.
+model Resource {
+  id              String   @id @default(cuid())
+  projectId       String
+  entityId        String
+  /// Plural kebab-case name (e.g. "todo-lists").
+  name            String
+  /// Operations exposed. JSON shape: ResourceExposedOps.
+  /// Example: ["list", "read", "create", "update", "delete"]
+  exposedOps      Json
+  /// Pagination + filter + sort + search. JSON shape: QueryConfig.
+  queryConfig     Json?
+  /// Default Policy applied to all ops (overridable per op).
+  defaultPolicyId String?
+  currentVersion  Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  entity        Entity  @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  defaultPolicy Policy? @relation("ResourceDefaultPolicy", fields: [defaultPolicyId], references: [id])
+  policies      Policy[] @relation("ResourcePolicies")
+
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+/// Explicit backend behavior. THE thing the system can do.
+/// QUERY = read-only, COMMAND = mutation/side-effects, WORKFLOW reserved
+/// for V3+ (use Triggers to chain Operations in V1).
+model Operation {
+  id             String        @id @default(cuid())
+  projectId      String
+  /// camelCase name (e.g. "createTodoList", "shareTodoList").
+  name           String
+  kind           OperationKind
+  /// JSON Schema of inputs (Zod-derivable).
+  inputSchema    Json
+  /// JSON Schema of outputs (optional for COMMAND, required for QUERY).
+  outputSchema   Json?
+  /// Entities read (read-only). JSON shape: string[]
+  reads          Json?
+  /// Entities written (create/update/delete). JSON shape: string[]
+  writes         Json?
+  /// Sequence of steps. Shape: OperationStep[] (cf. Step DSL).
+  steps          Json
+  /// Optional human pseudo-code — informative only, not interpreted.
+  bodyHint       String?
+  currentVersion Int           @default(1)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  forms    Form[]
+  triggers Trigger[]
+  policies Policy[]
+
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+enum OperationKind {
+  QUERY
+  COMMAND
+  /// Reserved for V3+. Do not use in V1 — chain via Triggers instead.
+  WORKFLOW
+
+  @@schema("dtfs")
+}
+
+/// Authorization rule. Compilable to Hono middleware, Prisma where-clause,
+/// and (V2) Postgres Row Level Security.
+model Policy {
+  id             String       @id @default(cuid())
+  projectId      String
+  name           String
+  scope          PolicyScope
+  resourceId     String?
+  operationId    String?
+  entityId       String?
+  /// For scope=ENTITY+FIELD, the targeted field.
+  fieldName      String?
+  effect         PolicyEffect @default(ALLOW)
+  /// Expression-tree. Shape: PolicyRule (cf. Policy DSL).
+  rule           Json
+  currentVersion Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  project          Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  resource         Resource?  @relation("ResourcePolicies", fields: [resourceId], references: [id], onDelete: SetNull)
+  operation        Operation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
+  entity           Entity?    @relation(fields: [entityId], references: [id], onDelete: SetNull)
+  defaultFor       Resource[] @relation("ResourceDefaultPolicy")
+
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+enum PolicyScope {
+  RESOURCE
+  OPERATION
+  ENTITY
+  FIELD
+
+  @@schema("dtfs")
+}
+
+enum PolicyEffect {
+  ALLOW
+  DENY
+
+  @@schema("dtfs")
+}
+
+/// Named connection to an external service. Secrets live elsewhere —
+/// secretRefs points to env vars or a secret store.
+model Integration {
+  id             String   @id @default(cuid())
+  projectId      String
+  /// Project-local key used by Operations (e.g. "email", "billing").
+  key            String
+  /// Technical provider (e.g. "stripe", "sendgrid", "aws-s3", "openai").
+  provider       String
+  /// Verbs exposed by this provider. JSON shape: string[] (e.g. ["email.send"]).
+  capabilities   Json
+  /// Public config (URLs, models, etc.). Shape specific per provider.
+  configSchema   Json
+  /// Secret references, e.g. { apiKey: "env:STRIPE_SECRET_KEY" }
+  secretRefs     Json?
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, key])
+  @@schema("dtfs")
+}
+
+/// Non-human cause that fires an Operation. UI submits are handled directly
+/// by Form.operationId — not via Trigger.
+model Trigger {
+  id             String      @id @default(cuid())
+  projectId      String
+  name           String
+  kind           TriggerKind
+  /// Source definition, shape by kind:
+  ///   EVENT    : { event: "order.paid" }
+  ///   SCHEDULE : { cron: "0 0 * * *" }
+  ///   WEBHOOK  : { path: "/webhooks/stripe", method: "POST", verify?: string }
+  source         Json
+  operationId    String
+  /// Mapping from source to Operation input. JSONata expressions.
+  inputMapping   Json?
+  currentVersion Int         @default(1)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+enum TriggerKind {
+  EVENT
+  SCHEDULE
+  WEBHOOK
+
+  @@schema("dtfs")
+}
+
+/// Composable trait on an Entity. Must belong to the V1 catalogue (cf.
+/// BACKEND_MODEL.md). Expanded into Resources/Operations/Policies/relations
+/// via POST /api/projects/:id/expand-behaviors before codegen.
+model Behavior {
+  id             String   @id @default(cuid())
+  projectId      String
+  entityId       String
+  /// Catalogue name (e.g. "ownable", "soft-deletable", "publishable").
+  kind           String
+  /// Config specific per kind. Shape documented in BACKEND_MODEL.md.
+  config         Json     @default("{}")
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  entity  Entity  @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, entityId, kind])
+  @@schema("dtfs")
+}
+
+/// Logical group of Revisions, git-commit style. Every mutation belongs to
+/// a ChangeSet (auto-created if no explicit context). Revertable atomically.
+model ChangeSet {
+  id           String          @id @default(cuid())
+  projectId    String
+  /// Human-readable message (or auto-generated for implicit changesets).
+  message      String
+  /// User.id of the author. Null for seed/system mutations.
+  actorId      String?
+  status       ChangeSetStatus @default(DRAFT)
+  /// Builds an APPLIED-chain ancestry tree.
+  parentId     String?
+  /// If non-null, this ChangeSet is itself a revert of another.
+  revertOfId   String?
+  appliedAt    DateTime?
+  revertedAt   DateTime?
+  /// If reverted, by which ChangeSet?
+  revertedById String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor      User?       @relation(fields: [actorId], references: [id])
+  parent     ChangeSet?  @relation("CSParent", fields: [parentId], references: [id])
+  children   ChangeSet[] @relation("CSParent")
+  revertOf   ChangeSet?  @relation("CSRevert", fields: [revertOfId], references: [id])
+  reverts    ChangeSet[] @relation("CSRevert")
+  revertedBy ChangeSet?  @relation("CSRevertedBy", fields: [revertedById], references: [id])
+  revertedSet        ChangeSet[]         @relation("CSRevertedBy")
+  revisions          Revision[]
+  generatedArtifacts GeneratedArtifact[]
+
+  @@index([projectId, createdAt])
+  @@schema("dtfs")
+}
+
+enum ChangeSetStatus {
+  DRAFT
+  APPLIED
+  REVERTED
+
+  @@schema("dtfs")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// dtfs — Phase 0 skeleton: upstream + downstream pipeline placeholders.
+// All models share { id, projectId, name?, data Json, currentVersion?,
+// createdAt, updatedAt }. No HTTP routes / UI / MCP tools yet — these are
+// reserved seats for phases 1-10.
+// ════════════════════════════════════════════════════════════════════════
+
+// ─── Layer 1 — Product Understanding ──────────────────────────────────
+
+/// High-level natural-language understanding of the product. Stored typed
+/// columns for the well-known facets (personas, goals, domain, ...) so
+/// the LLM doesn't have to invent JSON keys. Required fields enforced by
+/// `validateProductSpec` (backend/src/lib/product-spec-validation.ts).
+model ProductSpec {
+  id              String   @id @default(cuid())
+  projectId       String
+  title           String
+  description     String
+  domain          String?
+  /// JSON shape: Persona[] — { kind, label, needs[], frustrations[] }
+  targetUsers     Json
+  /// JSON shape: Goal[] — { kind: "USER"|"BUSINESS"|"TECHNICAL"; title; metric? }
+  goals           Json
+  /// JSON shape: string[] — explicit non-goals
+  nonGoals        Json?
+  /// JSON shape: Persona[] — more detailed personas (extends targetUsers)
+  personas        Json?
+  /// JSON shape: UserJourney[] — { name; steps[]; happyPath; edgeCases[] }
+  userJourneys    Json?
+  /// JSON shape: BusinessObject[] — { name; attributes[]; relations[]; lifecycle }
+  businessObjects Json?
+  /// JSON shape: BusinessRule[] — { id; statement; appliesTo; priority }
+  businessRules   Json?
+  /// JSON shape: GlossaryTerm[] — { term; definition; aliases? }
+  glossary        Json?
+  /// JSON shape: Assumption[] — { statement; confidence; rationale? }
+  assumptions     Json?
+  /// JSON shape: OpenQuestion[] — { question; blockedBy?; resolution? }
+  openQuestions   Json?
+  currentVersion  Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  screenSpecs     ScreenSpec[]
+  @@index([projectId])
+  @@schema("dtfs")
+}
+
+// ─── Layer 2 — Screen Understanding ───────────────────────────────────
+
+/// Functional intent of a single screen — actor, purpose, components,
+/// data needs, actions, states. Captured BEFORE any HTML or code exists.
+/// Mapping to an actual Screen happens at Layer 5 (PlatformMapping) via
+/// RequirementMapping — there is no FK from ScreenSpec to Screen here.
+///
+/// V1 required fields (enforced by validateScreenSpec):
+///   name · description · actor · purpose · components · dataNeeds
+///   · actions · openQuestions · assumptions
+model ScreenSpec {
+  id             String       @id @default(cuid())
+  projectId      String
+  productSpecId  String?
+  name           String
+  description    String
+  /// Primary role using this screen (e.g. "Manager", "Agent", "Customer").
+  actor          String?
+  /// What this screen lets the actor accomplish, in one sentence.
+  purpose        String?
+  /// More nuanced "why now" or "after which step".
+  userIntent     String?
+  /// Free-form layout hint (e.g. "dashboard 3-cards-grid", "centered form").
+  layoutHint     String?
+  /// JSON shape: ScreenComponent[] — { kind, label?, description? }
+  components     Json?
+  /// JSON shape: ScreenField[] — for input forms only
+  fields         Json?
+  /// JSON shape: ScreenAction[] — { label, kind, target?, requiresAuth? }
+  actions        Json?
+  /// JSON shape: ScreenDataNeed[] — { entity, shape, filterBy?, realtime? }
+  dataNeeds      Json?
+  /// JSON shape: BusinessRule[] — validation rules specific to this screen
+  businessRules  Json?
+  /// JSON shape: ScreenState[] — { trigger, message, cta? }
+  emptyStates    Json?
+  /// JSON shape: ScreenState[]
+  errorStates    Json?
+  /// JSON shape: Assumption[] — { statement, confidence, rationale? }
+  assumptions    Json?
+  /// JSON shape: OpenQuestion[] — { question, blockedBy? }
+  openQuestions  Json?
+  currentVersion Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  productSpec    ProductSpec? @relation(fields: [productSpecId], references: [id], onDelete: SetNull)
+  @@index([projectId])
+  @@schema("dtfs")
+}
+
+// ─── Layer 3 — Clarification ──────────────────────────────────────────
+
+/// An unresolved question that blocks DeltaSpec generation until ANSWERED
+/// or explicitly DEFERRED. `scope` is a string tag like "screen:Dashboard"
+/// or "feature:billing" ; `targetId` points at the related row when known
+/// (a ScreenSpec, ProductSpec, etc.).
+model OpenQuestion {
+  id        String   @id @default(cuid())
+  projectId String
+  scope     String
+  targetId  String?
+  question  String
+  answer    String?
+  /// OPEN | ANSWERED | DEFERRED
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId, status])
+  @@schema("dtfs")
+}
+
+/// A statement the system believes but that hasn't been validated by the
+/// user. Blocks DeltaSpec generation until ACCEPTED or REJECTED.
+model Assumption {
+  id        String   @id @default(cuid())
+  projectId String
+  scope     String
+  targetId  String?
+  text      String
+  /// OPEN | ACCEPTED | REJECTED
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId, scope])
+  @@schema("dtfs")
+}
+
+// ─── Layer 4 — Spec Kit ───────────────────────────────────────────────
+
+/// Markdown artifact from a Spec-Driven Development flow (Spec Kit
+/// convention). One `kind` (constitution|spec|plan|tasks|research|
+/// data-model|quickstart|platform-mapping|contracts|notes). `featureKey`
+/// is null for project-wide artifacts (e.g. constitution), set otherwise.
+/// `path` is the disk path relative to project.localPath when synced.
+/// `source` discriminates "generated" (by an agent) / "speckit" (by the
+/// official CLI) / "manual" (handwritten).
+model SpecArtifact {
+  id             String   @id @default(cuid())
+  projectId      String
+  kind           String
+  featureKey     String?
+  path           String?
+  content        String
+  contentHash    String
+  source         String   @default("manual")
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId, kind])
+  @@index([projectId, featureKey])
+  @@schema("dtfs")
+}
+
+enum SpecArtifactKind {
+  CONSTITUTION
+  SPEC
+  PLAN
+  TASKS
+  NOTES
+
+  @@schema("dtfs")
+}
+
+// ─── Layer 5 — Platform Mapping ───────────────────────────────────────
+
+/// A discrete requirement extracted from product/screen specs. Mapped via
+/// RequirementMapping to one or more platform concepts.
+/// Traceable requirement extracted from SDD artifacts (spec.md / tasks.md)
+/// or written manually. Each row has a project-unique `key` (e.g. "REQ-001"),
+/// can link to a ProductSpec, and tracks acceptance criteria as JSON
+/// (Given/When/Then). Status lifecycle: DRAFT → ACCEPTED → MAPPED.
+model Requirement {
+  id                 String   @id @default(cuid())
+  projectId          String
+  productSpecId      String?
+  /// Project-unique stable identifier (e.g. "REQ-001"). Used for cross-refs.
+  key                String
+  title              String
+  description        String
+  /// MUST | SHOULD | NICE | HIGH | CRITICAL | …  (free string, agent convention)
+  priority           String?
+  /// DRAFT | ACCEPTED | MAPPED | REJECTED
+  status             String   @default("DRAFT")
+  /// JSON shape: { given: string; when: string; then: string }[]
+  acceptanceCriteria Json?
+  /// Origin: natural | speckit | imported | manual
+  source             String?
+  currentVersion     Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  project            Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mappings           RequirementMapping[]
+  @@unique([projectId, key])
+  @@index([projectId])
+  @@schema("dtfs")
+}
+
+/// Links a Requirement to the platform concept that fulfills it. A single
+/// Requirement typically maps to several targets (Entity + Operation +
+/// Screen + Policy + TestScenario).
+model RequirementMapping {
+  id            String   @id @default(cuid())
+  projectId     String
+  requirementId String
+  /// One of: "Entity"|"Operation"|"Policy"|"Screen"|"Field"|"TestScenario"
+  /// |"Resource"|"Workflow"|"Component"|"Form"|...
+  targetType    String
+  targetId      String
+  /// 0.0–1.0 — agent's confidence in this mapping
+  confidence    Float?
+  rationale     String?
+  createdAt     DateTime    @default(now())
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  @@index([projectId, requirementId])
+  @@schema("dtfs")
+}
+
+// ─── Platform additions (announced in earlier brainstorm) ─────────────
+
+/// Long-running orchestrated process. V1 placeholder — runtime (Temporal)
+/// arrives with codegen V3.
+model Workflow {
+  id             String   @id @default(cuid())
+  projectId      String
+  name           String
+  inputSchema    Json     @default("{}")
+  /// Step list (custom shape, to be formalized in Workflow DSL).
+  steps          Json     @default("[]")
+  /// Retry / timeout / compensation policy.
+  durability     Json?
+  bodyHint       String?
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+/// Uploaded file. Storage backend is abstracted via JSON. Content-addressed
+/// via SHA-256 for dedup + cache.
+model Asset {
+  id             String   @id @default(cuid())
+  projectId      String
+  /// plan.md: human-readable name for the asset
+  name           String?
+  /// JSON shape: { kind: "local"|"s3"|...; path|bucket+key|... }
+  storage        Json
+  mimeType       String
+  sizeBytes      Int
+  contentHash    String
+  originalName   String?
+  entityId       String?
+  attributeName  String?
+  metadata       Json?
+  /// Optional owning user (plan.md ownerId?)
+  ownerId        String?
+  currentVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner          User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  @@index([projectId, contentHash])
+  @@schema("dtfs")
+}
+
+/// Authentication method declared for the generated app.
+model AuthMethod {
+  id             String         @id @default(cuid())
+  projectId      String
+  name           String
+  kind           AuthMethodKind
+  config         Json
+  isDefault      Boolean        @default(false)
+  currentVersion Int            @default(1)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+enum AuthMethodKind {
+  SESSION
+  BEARER
+  HMAC
+  APIKEY
+  /// plan.md alias
+  API_KEY
+
+  @@schema("dtfs")
+}
+
+enum SecretRefKind {
+  ENV
+  VAULT
+
+  @@schema("dtfs")
+}
+
+enum ActionKind {
+  OPERATION
+  NAVIGATION
+  EVENT_EMIT
+  EXTERNAL_LINK
+
+  @@schema("dtfs")
+}
+
+enum DataBindingSource {
+  QUERY
+  OPERATION
+  STATIC
+
+  @@schema("dtfs")
+}
+
+enum GeneratedArtifactKind {
+  CODE
+  MIGRATION
+  ASSET
+  TEST
+  DOCS
+
+  @@schema("dtfs")
+}
+
+enum DeploymentTargetKind {
+  DEV
+  STAGING
+  PRODUCTION
+
+  @@schema("dtfs")
+}
+
+enum TestScenarioKind {
+  UNIT
+  INTEGRATION
+  E2E
+
+  @@schema("dtfs")
+}
+
+enum TestScenarioStatus {
+  DRAFT
+  ACTIVE
+  FAILING
+
+  @@schema("dtfs")
+}
+
+/// Pointer to a secret. The VALUE is never stored here — only a reference
+/// to the env var or external secret store entry.
+model Secret {
+  id          String         @id @default(cuid())
+  projectId   String
+  key         String
+  /// JSON shape: { kind: "env"; var: "STRIPE_SECRET_KEY" } | { kind: "vault"; path: "..." }
+  vault       Json
+  /// plan.md: human-readable name (alias for key, may differ)
+  name        String?
+  /// plan.md: discriminates ENV vs VAULT
+  refKind     SecretRefKind?
+  /// plan.md: path in vault or env var name
+  path        String?
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, key])
+  @@schema("dtfs")
+}
+
+/// Per-environment overrides (dev / staging / prod).
+model Environment {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  /// JSON shape: { secrets: { stripeKey: "env:STRIPE_TEST_KEY" }, vars: { ... } }
+  overrides Json     @default("{}")
+  /// plan.md: general config blob (alias / extension of overrides)
+  config    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+/// Application role (RBAC). Permissions are an array of capability keys.
+model AppRole {
+  id          String   @id @default(cuid())
+  projectId   String
+  key         String
+  label       String
+  /// plan.md: canonical role name (may mirror key)
+  name        String?
+  description String?
+  permissions Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, key])
+  @@schema("dtfs")
+}
+
+/// Internal event the system emits (consumed by Triggers, Workflows).
+model EventDefinition {
+  id            String   @id @default(cuid())
+  projectId     String
+  name          String
+  payloadSchema Json     @default("{}")
+  /// plan.md: alias for payloadSchema (JsonSchema)
+  schema        Json?
+  description   String?
+  source        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+// ─── UI binding (manquaient en V1) ────────────────────────────────────
+
+/// Declarative UI action: what does this button/component do?
+model Action {
+  id           String      @id @default(cuid())
+  projectId    String
+  componentId  String?
+  kind         String      // "submit" | "navigate" | "callOperation" | "callWorkflow" | ...
+  /// What the action targets. "Operation" | "Workflow" | "Url" | ...
+  targetType   String
+  targetId     String?
+  /// JSON shape: { inputMapping?, onSuccess?, onError? }
+  data         Json        @default("{}")
+  /// plan.md: camelCase name unique within project
+  name         String?
+  /// plan.md: typed discriminant
+  actionKind   ActionKind?
+  /// plan.md: operation name / route / event name / url
+  target       String?
+  /// plan.md: extra config blob
+  config       Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId])
+  @@schema("dtfs")
+}
+
+/// Data binding: where does this component get its data from?
+model DataBinding {
+  id              String             @id @default(cuid())
+  projectId       String
+  /// Loose component reference (original field, no FK constraint)
+  componentId     String?
+  /// JSON shape: { kind: "Resource"|"Operation"|"Entity"; ref: ... }
+  source          Json
+  /// JSON shape: { filter, sort, paginate, fields }
+  query           Json               @default("{}")
+  /// plan.md: FK to Component with cascade
+  componentFkId   String?
+  /// plan.md: discriminant enum
+  sourceKind      DataBindingSource?
+  /// plan.md: an Expr blob
+  expr            Json?
+  /// plan.md: prop to bind to on the component
+  targetProp      String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  component       Component?         @relation(fields: [componentFkId], references: [id], onDelete: Cascade)
+  @@index([projectId])
+  @@schema("dtfs")
+}
+
+// ─── Layer 9 — Codegen ────────────────────────────────────────────────
+
+/// File produced by the codegen pass. Tracked here so re-runs can detect
+/// drift (content vs hash) and avoid clobbering hand edits.
+model GeneratedArtifact {
+  id            String                 @id @default(cuid())
+  projectId     String
+  kind          String                 // "prisma-schema" | "next-page" | "hono-route" | ...
+  path          String
+  content       String
+  hash          String
+  /// plan.md: optional link to originating ChangeSet
+  changeSetId   String?
+  /// plan.md: typed discriminant
+  artifactKind  GeneratedArtifactKind?
+  /// plan.md: SHA-256 of content (canonical name)
+  contentHash   String?
+  /// plan.md: size in bytes
+  sizeBytes     Int?
+  /// plan.md: when this file was produced
+  generatedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  project       Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  changeSet     ChangeSet?             @relation(fields: [changeSetId], references: [id], onDelete: SetNull)
+  @@index([projectId, path])
+  @@schema("dtfs")
+}
+
+/// Deployment target — where the generated app ships.
+model DeploymentTarget {
+  id           String                @id @default(cuid())
+  projectId    String
+  name         String
+  kind         String                // "local" | "vercel" | "fly" | "docker" | "custom"
+  config       Json                  @default("{}")
+  /// plan.md: typed discriminant (DEV | STAGING | PRODUCTION)
+  targetKind   DeploymentTargetKind?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  project      Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+// ─── Layer 10 — Test & Audit ──────────────────────────────────────────
+
+/// Declarative test scenario (unit, integration, e2e, golden, contract).
+model TestScenario {
+  id             String              @id @default(cuid())
+  projectId      String
+  operationId    String?
+  screenId       String?
+  name           String
+  /// JSON shape: { kind: "unit"|"e2e"|..., args }
+  inputs         Json                @default("{}")
+  expected       Json                @default("{}")
+  mocks          Json                @default("{}")
+  /// plan.md: typed kind
+  scenarioKind   TestScenarioKind?
+  /// plan.md: steps blob
+  steps          Json?
+  /// plan.md: expected blob (alias for expected field above)
+  expectedResult Json?
+  /// plan.md: lifecycle status
+  scenarioStatus TestScenarioStatus? @default(DRAFT)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId])
+  @@schema("dtfs")
+}
+
+/// Runtime audit trail (distinct from Revision, which is at the Control
+/// Plane definition level). For now : platform events worth tracing.
+/// Append-only — never update or delete rows.
+model AuditLog {
+  id         String   @id @default(cuid())
+  projectId  String
+  actorId    String?
+  kind       String   // "spec.apply" | "codegen.run" | "deploy" | ...
+  detail     Json     @default("{}")
+  /// plan.md: verb describing what happened
+  action     String?
+  /// plan.md: model name of the affected entity
+  entityType String?
+  /// plan.md: id of the affected entity
+  entityId   String?
+  /// plan.md: free JSON details
+  details    Json?
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  @@index([projectId, createdAt])
+  @@schema("dtfs")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// dtfs — Phase 6: PlatformSpec Proposal (read-only synthesis)
+// ════════════════════════════════════════════════════════════════════════
+
+/// Read-only synthesis of what the Control Plane SHOULD look like for a
+/// given feature, based on Phases 1-5 inputs. Reviewed by a human before
+/// being turned into a real DeltaSpec.
+///
+/// Lifecycle: DRAFT → ACCEPTED → APPLIED (DeltaSpec committed).
+/// REJECTED is terminal.
+model PlatformSpecProposal {
+  id                 String   @id @default(cuid())
+  projectId          String
+  featureKey         String?
+  /// Big JSON document. Top-level keys: entities, attributes, relations,
+  /// resources, operations, policies, screens, components, forms, fields,
+  /// actions, dataBindings, assets, authMethods, events, testScenarios,
+  /// behaviors, triggers, integrations, workflows. Each is an array of
+  /// "to-create" or "to-update" descriptors. See docs/PHASES/PHASE_6.md.
+  proposal           Json
+  /// Lint-level concerns: { code, message, target?, severity }[]
+  warnings           Json     @default("[]")
+  /// Assumptions made: { statement, confidence }[]
+  assumptions        Json     @default("[]")
+  /// Unresolved questions: { question, blockedBy? }[]
+  openQuestions      Json     @default("[]")
+  /// 0.0–1.0
+  confidenceScore    Float?
+  /// DRAFT | ACCEPTED | REJECTED | APPLIED
+  status             String   @default("DRAFT")
+  /// Free notes (reviewer rationale, applied-by, etc.)
+  rationale          String?
+  /// If APPLIED, which ChangeSet materialized this proposal.
+  appliedChangeSetId String?
+  currentVersion     Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId, status])
+  @@index([projectId, featureKey])
+  @@schema("dtfs")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// dtfs — Step 25: Runtime Target + Contracts
+// ════════════════════════════════════════════════════════════════════════
+
+/// Describes the tech stack to use when generating the full-stack app.
+/// One project can have multiple named targets (e.g. "default", "hono-next").
+/// Relation choice: RuntimeTarget carries a required FK to Project (onDelete
+/// Cascade), so an inverse `runtimeTargets RuntimeTarget[]` is added to
+/// Project. The 3 Contract models carry a bare `projectId String` with NO
+/// declared Prisma relation — they are re-generated artefacts (like
+/// GeneratedArtifact) and the FK constraint is enforced via migration SQL
+/// only (not Prisma relations). This avoids adding 3 more inverse fields on
+/// Project and keeps the schema additive.
+model RuntimeTarget {
+  id             String   @id @default(cuid())
+  projectId      String
+  name           String
+  backend        Json
+  frontend       Json
+  auth           Json
+  database       Json
+  packageManager String?
+  runtime        String?
+  config         Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+  @@schema("dtfs")
+}
+
+/// Contract describing every API route the backend must expose.
+/// Re-generated from Entity/Resource/Operation/Policy/AuthMethod — do not
+/// version (see versioning.ts comment).
+model BackendContract {
+  id              String   @id @default(cuid())
+  projectId       String
+  runtimeTargetId String?
+  apiBasePath     String   @default("/api")
+  routes          Json
+  schemas         Json
+  middlewares     Json?
+  auth            Json?
+  errors          Json?
+  generatedFrom   Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@schema("dtfs")
+}
+
+/// Contract describing every page/component the frontend must generate.
+/// Re-generated from Screen/Component/Form/Action/DataBinding — do not
+/// version (see versioning.ts comment).
+model FrontendContract {
+  id              String   @id @default(cuid())
+  projectId       String
+  runtimeTargetId String?
+  routes          Json
+  pages           Json
+  layouts         Json?
+  components      Json
+  forms           Json
+  dataBindings    Json
+  actions         Json
+  authGuards      Json?
+  generatedFrom   Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@schema("dtfs")
+}
+
+/// Bridge between backend and frontend: shared types, schemas, API client.
+/// Re-generated artefact — do not version (see versioning.ts comment).
+model SharedContract {
+  id        String   @id @default(cuid())
+  projectId String
+  types     Json
+  schemas   Json
+  apiClient Json?
+  errors    Json?
+  events    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@schema("dtfs")
 }

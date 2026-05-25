@@ -9,6 +9,37 @@
 //     to get a complete snapshot.
 
 import type { PrismaClient } from "../generated/prisma/client";
+import { getChangeSet } from "./lib/changeset-context";
+
+// Subset of VERSIONED_MODELS that ALSO have a `currentVersion` column on
+// their row. For these, the update interceptor bumps the column. Others
+// (Phase 3+: OpenQuestion, Assumption) are versioned via Revision rows
+// only.
+const MODELS_WITH_CURRENT_VERSION = new Set<string>([
+	"Project",
+	"Theme",
+	"Entity",
+	"Attribute",
+	"EntityRecord",
+	"Screen",
+	"Component",
+	"Form",
+	"Field",
+	"FieldOption",
+	"Translation",
+	"EntityRelation",
+	"Resource",
+	"Operation",
+	"Policy",
+	"Integration",
+	"Trigger",
+	"Behavior",
+	"ProductSpec",
+	"ScreenSpec",
+	"SpecArtifact",
+	"Requirement",
+	"PlatformSpecProposal",
+]);
 
 const VERSIONED_MODELS = new Set<string>([
 	"Project",
@@ -22,6 +53,47 @@ const VERSIONED_MODELS = new Set<string>([
 	"Field",
 	"FieldOption",
 	"Translation",
+	// Control Plane V1 — new concepts (ChangeSet itself is NOT versioned).
+	"EntityRelation",
+	"Resource",
+	"Operation",
+	"Policy",
+	"Integration",
+	"Trigger",
+	"Behavior",
+	// Phase 1 — Product Understanding
+	"ProductSpec",
+	// Phase 2 — Screen Understanding
+	"ScreenSpec",
+	// Phase 3 — Clarification
+	"OpenQuestion",
+	"Assumption",
+	// Phase 4 — Spec Kit
+	"SpecArtifact",
+	// Phase 5 — Platform Mapping
+	"Requirement",
+	"RequirementMapping",
+	// Phase 6 — PlatformSpec Proposal
+	"PlatformSpecProposal",
+	// Phase 10 — Full-stack app coverage (versioned, not AuditLog)
+	"Workflow",
+	"Asset",
+	"AuthMethod",
+	"Secret",
+	"Environment",
+	"AppRole",
+	"EventDefinition",
+	"Action",
+	"DataBinding",
+	"GeneratedArtifact",
+	"DeploymentTarget",
+	"TestScenario",
+	// Step 25 — Runtime Target (versioned: it is a definition, not a generated artefact)
+	// BackendContract / FrontendContract / SharedContract are NOT versioned here:
+	// they are fully re-generated from Control Plane data on every codegen pass
+	// (like GeneratedArtifact rows). Versioning them would create noisy Revision
+	// rows on every regeneration with no actionable diff.
+	"RuntimeTarget",
 ]);
 
 type AnyRow = Record<string, unknown> & { id?: string; currentVersion?: number };
@@ -52,6 +124,21 @@ function delegateOf(client: PrismaClient, model: string) {
 	return delegate;
 }
 
+// For models without an in-row currentVersion column, derive the next
+// revision version from the Revision table.
+async function nextRevisionVersion(
+	client: PrismaClient,
+	model: string,
+	entityId: string,
+): Promise<number> {
+	const last = await client.revision.findFirst({
+		where: { entityType: model, entityId },
+		orderBy: { version: "desc" },
+		select: { version: true },
+	});
+	return (last?.version ?? 0) + 1;
+}
+
 export function withVersioning(client: PrismaClient) {
 	return client.$extends({
 		name: "dtfs-versioning",
@@ -60,13 +147,19 @@ export function withVersioning(client: PrismaClient) {
 				async create({ model, args, query }) {
 					const result = (await query(args)) as AnyRow;
 					if (VERSIONED_MODELS.has(model) && result?.id) {
+						const cs = getChangeSet();
+						const version = MODELS_WITH_CURRENT_VERSION.has(model)
+							? (result.currentVersion ?? 1)
+							: await nextRevisionVersion(client, model, result.id);
 						await client.revision.create({
 							data: {
 								entityType: model,
 								entityId: result.id,
-								version: result.currentVersion ?? 1,
+								version,
 								op: "CREATE",
 								data: result as object,
+								changeSetId: cs?.changeSetId ?? null,
+								actorId: cs?.actorId ?? null,
 							},
 						});
 					}
@@ -82,7 +175,11 @@ export function withVersioning(client: PrismaClient) {
 					});
 
 					const data = (args as { data: Record<string, unknown> }).data;
-					if (data && data.currentVersion === undefined) {
+					if (
+						data &&
+						data.currentVersion === undefined &&
+						MODELS_WITH_CURRENT_VERSION.has(model)
+					) {
 						data.currentVersion = { increment: 1 };
 					}
 
@@ -93,14 +190,20 @@ export function withVersioning(client: PrismaClient) {
 					})) as AnyRow | null;
 					if (!after?.id) return after;
 
+					const cs = getChangeSet();
+					const version = MODELS_WITH_CURRENT_VERSION.has(model)
+						? (after.currentVersion ?? 1)
+						: await nextRevisionVersion(client, model, after.id);
 					await client.revision.create({
 						data: {
 							entityType: model,
 							entityId: after.id,
-							version: after.currentVersion ?? 1,
+							version,
 							op: "UPDATE",
 							data: after as object,
 							diff: diffRows(before, after) as object,
+							changeSetId: cs?.changeSetId ?? null,
+							actorId: cs?.actorId ?? null,
 						},
 					});
 					return after;
@@ -117,13 +220,19 @@ export function withVersioning(client: PrismaClient) {
 					const result = await query(args);
 
 					if (before?.id) {
+						const cs = getChangeSet();
+						const version = MODELS_WITH_CURRENT_VERSION.has(model)
+							? (before.currentVersion ?? 0) + 1
+							: await nextRevisionVersion(client, model, before.id);
 						await client.revision.create({
 							data: {
 								entityType: model,
 								entityId: before.id,
-								version: (before.currentVersion ?? 0) + 1,
+								version,
 								op: "DELETE",
 								data: before as object,
+								changeSetId: cs?.changeSetId ?? null,
+								actorId: cs?.actorId ?? null,
 							},
 						});
 					}

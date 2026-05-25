@@ -1,0 +1,7 @@
+{
+  "name": "dtfs-history",
+  "version": "0.1.0",
+  "description": "ChangeSet history, human-readable diff explanations, and revert capabilities. Wraps dtfs-diff-explainer agent and revert command.",
+  "author": "dtfs",
+  "keywords": ["dtfs", "history", "changeset", "diff", "revert", "audit"]
+}

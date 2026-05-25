@@ -1,0 +1,55 @@
+{
+  "marketplace": "dtfs",
+  "version": "0.1.0",
+  "description": "Design-to-Fullstack (dtfs) plugin marketplace — harness for turning designs into full-stack apps via Claude Code.",
+  "plugins": [
+    {
+      "name": "dtfs-core",
+      "path": "../dtfs-core",
+      "description": "Core transversal commands (status, apply), guard hook, and MCP server pointer. Required by all other dtfs plugins.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dtfs-natural-spec",
+      "path": "../dtfs-natural-spec",
+      "description": "Natural language to structured spec: product analyst, screen spec writer, question manager (Phases 1–3).",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dtfs-speckit",
+      "path": "../dtfs-speckit",
+      "description": "Spec Kit SDD writer and reviewer, platform mapper, requirement extractor (Phase 4–6).",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dtfs-html-import",
+      "path": "../dtfs-html-import",
+      "description": "Import HTML mockups/designs into ScreenSpec format.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dtfs-history",
+      "path": "../dtfs-history",
+      "description": "ChangeSet history, diff explanations, and revert capabilities.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dtfs-behaviors",
+      "path": "../dtfs-behaviors",
+      "description": "Behavior expansion reference and expand_behaviors tool documentation.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dtfs-codegen",
+      "path": "../dtfs-codegen",
+      "description": "Code generation reference and generate_app tool documentation.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dtfs-security",
+      "path": "../dtfs-security",
+      "description": "Governance, guard hook, spec validator, and validate command (defense-in-depth).",
+      "version": "0.1.0"
+    }
+  ]
+}

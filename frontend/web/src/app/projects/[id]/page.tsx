@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ExternalLink, Folder, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { use } from "react";
 import { ManageLocalesDialog } from "@/components/manage-locales-dialog";
@@ -57,6 +57,60 @@ export default function ProjectDetail({
 			/>
 
 			<div className="space-y-8">
+				{(project.localPath ||
+					project.githubRepo ||
+					(project.enabledScreenTypes && project.enabledScreenTypes.length > 0)) && (
+					<Section title="Setup">
+						<Card>
+							<dl className="divide-y divide-zinc-100 text-sm">
+								{project.localPath && (
+									<SetupRow
+										icon={<Folder className="h-3.5 w-3.5 text-zinc-500" />}
+										label="Local directory"
+										value={
+											<code className="font-mono text-xs text-zinc-700">
+												{project.localPath}
+											</code>
+										}
+									/>
+								)}
+								{project.githubRepo && (
+									<SetupRow
+										icon={<GitBranch className="h-3.5 w-3.5 text-zinc-500" />}
+										label="GitHub repo"
+										value={
+											<a
+												href={`https://github.com/${project.githubRepo}`}
+												target="_blank"
+												rel="noreferrer"
+												className="inline-flex items-center gap-1 font-mono text-xs text-blue-600 underline-offset-2 hover:underline"
+											>
+												{project.githubRepo}
+												<ExternalLink className="h-3 w-3" />
+											</a>
+										}
+									/>
+								)}
+								{project.enabledScreenTypes &&
+									project.enabledScreenTypes.length > 0 && (
+										<SetupRow
+											label="Surfaces"
+											value={
+												<div className="flex flex-wrap gap-1">
+													{project.enabledScreenTypes.map((t) => (
+														<Badge key={t} variant="info">
+															{t}
+														</Badge>
+													))}
+												</div>
+											}
+										/>
+									)}
+							</dl>
+						</Card>
+					</Section>
+				)}
+
 				<Section
 					title="Locales"
 					count={project.locales.length}
@@ -135,6 +189,26 @@ export default function ProjectDetail({
 					)}
 				</Section>
 			</div>
+		</div>
+	);
+}
+
+function SetupRow({
+	icon,
+	label,
+	value,
+}: {
+	icon?: React.ReactNode;
+	label: string;
+	value: React.ReactNode;
+}) {
+	return (
+		<div className="flex items-center justify-between px-4 py-3">
+			<span className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-zinc-500">
+				{icon}
+				{label}
+			</span>
+			<span>{value}</span>
 		</div>
 	);
 }

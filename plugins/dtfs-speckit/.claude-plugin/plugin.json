@@ -1,0 +1,7 @@
+{
+  "name": "dtfs-speckit",
+  "version": "0.1.0",
+  "description": "Spec Kit SDD writer and reviewer (Phase 4), platform mapper and requirement extractor (Phases 5–6). Produces constitution, spec, plan, tasks, and PlatformSpecProposal artifacts.",
+  "author": "dtfs",
+  "keywords": ["dtfs", "sdd", "speckit", "platform-mapping", "requirements", "phases-4-6"]
+}

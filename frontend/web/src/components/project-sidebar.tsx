@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
 	ChevronLeft,
+	Clock,
 	Database,
 	Languages,
 	LayoutDashboard,
@@ -29,6 +30,7 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
 		{ href: `${base}/screens`, label: "Screens", icon: MonitorPlay },
 		{ href: `${base}/entities`, label: "Entities", icon: Database },
 		{ href: `${base}/translations`, label: "Translations", icon: Languages },
+		{ href: `${base}/history`, label: "History", icon: Clock },
 	];
 
 	const { data } = useQuery({

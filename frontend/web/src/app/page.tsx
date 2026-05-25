@@ -1,9 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Layers, MonitorPlay } from "lucide-react";
+import { Layers, MonitorPlay, Plus } from "lucide-react";
 import Link from "next/link";
-import { NewProjectDialog } from "@/components/new-project-dialog";
+import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -38,7 +38,12 @@ export default function DashboardPage() {
 							fullstack
 						</span>
 					</div>
-					<NewProjectDialog />
+					<Link href="/projects/new">
+						<Button size="sm">
+							<Plus className="h-3.5 w-3.5" />
+							New project
+						</Button>
+					</Link>
 				</div>
 			</header>
 
@@ -64,7 +69,16 @@ export default function DashboardPage() {
 				)}
 
 				{data && data.projects.length === 0 && (
-					<EmptyState action={<NewProjectDialog />}>
+					<EmptyState
+						action={
+							<Link href="/projects/new">
+								<Button size="sm">
+									<Plus className="h-3.5 w-3.5" />
+									New project
+								</Button>
+							</Link>
+						}
+					>
 						No projects yet. Create your first one.
 					</EmptyState>
 				)}

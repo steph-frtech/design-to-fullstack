@@ -1,0 +1,7 @@
+{
+  "name": "dtfs-behaviors",
+  "version": "0.1.0",
+  "description": "Behavior expansion reference and expand_behaviors tool documentation. Documents how ScreenSpec behaviors map to backend operations and policy rules.",
+  "author": "dtfs",
+  "keywords": ["dtfs", "behaviors", "expansion", "dsl", "policy", "operations"]
+}

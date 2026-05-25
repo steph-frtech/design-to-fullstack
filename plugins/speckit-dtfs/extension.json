@@ -1,0 +1,36 @@
+{
+  "name": "speckit-dtfs",
+  "version": "0.1.0",
+  "type": "speckit-extension",
+  "description": "Spec Kit extension for design-to-fullstack. Adds platform mapping, DeltaSpec production, control plane pre-apply, and codegen contract templates.",
+  "author": "dtfs",
+  "keywords": ["speckit", "dtfs", "platform-mapping", "delta-spec", "codegen", "control-plane"],
+  "templates": [
+    {
+      "name": "platform-mapping",
+      "file": "platform-mapping.md",
+      "description": "Template for mapping Requirements to Control Plane targets (Entity, Operation, Policy, Screen, Behavior)."
+    },
+    {
+      "name": "delta-spec",
+      "file": "delta-spec.md",
+      "description": "Checklist and skeleton for producing a canonical DeltaSpec from an accepted PlatformSpecProposal."
+    },
+    {
+      "name": "control-plane-checklist",
+      "file": "control-plane-checklist.md",
+      "description": "Pre-apply checklist covering all gates (validity, changeset, coverage, governance) before calling apply_spec."
+    },
+    {
+      "name": "dtfs-codegen-contract",
+      "file": "dtfs-codegen-contract.md",
+      "description": "Contract specifying what the dtfs codegen consumes, produces, and guarantees."
+    }
+  ],
+  "install": {
+    "instructions": "Copy this directory into your project's `.speckit/extensions/speckit-dtfs/`. Reference templates by name in your Spec Kit configuration.",
+    "config_example": {
+      "extensions": ["speckit-dtfs"]
+    }
+  }
+}

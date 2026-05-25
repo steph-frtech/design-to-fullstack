@@ -1,0 +1,7 @@
+{
+  "name": "dtfs-security",
+  "version": "0.1.0",
+  "description": "Governance, defense-in-depth guard hook, spec validator agent, and validate command. Ensures DeltaSpec correctness and ChangeSet gate enforcement.",
+  "author": "dtfs",
+  "keywords": ["dtfs", "security", "governance", "validation", "guard", "spec-validator"]
+}
